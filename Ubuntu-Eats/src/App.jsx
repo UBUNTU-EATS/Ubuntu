@@ -6,6 +6,7 @@ import {BrowserRouter as Router, Routes, Route} from 'react-router-dom';
 
 import './App.css'
 import LandingPage from './pages/LandingPage';
+import DonorDashboard from './pages/DonorDashboard';
 
 function App() {
   
@@ -13,6 +14,7 @@ function App() {
     <Router>
       <Routes>
         <Route path='/' element={<LandingPage />} />
+        <Route path='/donor-dashboard' element={<DonorDashboard />} />
         </Routes>
     </Router>
   )

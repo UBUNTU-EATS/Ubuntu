@@ -5,11 +5,8 @@
   text-align: center;
 }
 html, body {
-  margin: 0;
-  padding: 0;
-  height: 100%;
-  overflow-x: hidden;
-  overflow-y: auto;
+
+
   font-family: 'Segoe UI', sans-serif;
   background-color: #f9f9f9;
   scroll-behavior: smooth;
