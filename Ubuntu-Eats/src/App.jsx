@@ -6,13 +6,14 @@ import {BrowserRouter as Router, Routes, Route} from 'react-router-dom';
 
 import './App.css'
 import LandingPage from './pages/LandingPage';
+import MapWithDistance from './pages/MapWithDistance';
 
 function App() {
   
   return (
     <Router>
       <Routes>
-        <Route path='/' element={<LandingPage />} />
+        <Route path='/' element={<MapWithDistance/>} />
         </Routes>
     </Router>
   )
