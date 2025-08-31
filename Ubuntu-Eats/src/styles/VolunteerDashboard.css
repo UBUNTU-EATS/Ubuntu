@@ -11,7 +11,7 @@
 
 /* Header Styles */
 .dashboard-header {
-  background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
+  background: linear-gradient(135deg, #2e7d32 0%, #388e3c 100%);
   color: white;
   padding: 2rem;
   display: flex;
@@ -229,16 +229,16 @@
 }
 
 .nav-tab:hover {
-  color: #2196f3;
+  color: #2e7d32;
   background: rgba(33, 150, 243, 0.08);
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(33, 150, 243, 0.1);
 }
 
 .nav-tab.active {
-  color: #2196f3;
+  color: #2e7d32;
   background: linear-gradient(135deg, #ffffff 0%, #e3f2fd 100%);
-  border: 2px solid #2196f3;
+  border: 2px solid #2e7d32;
   border-bottom: 2px solid #ffffff;
   font-weight: 700;
   box-shadow: 0 -4px 12px rgba(33, 150, 243, 0.15),
@@ -254,7 +254,7 @@
   left: 0;
   right: 0;
   height: 4px;
-  background: linear-gradient(90deg, #2196f3, #ffeb3b, #2196f3);
+  background: linear-gradient(90deg, #2e7d32, #ffeb3b, #2e7d32);
   border-radius: 2px 2px 0 0;
 }
 
