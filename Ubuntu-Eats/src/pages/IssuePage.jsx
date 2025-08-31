@@ -99,6 +99,8 @@ const IssuesPage = () => {
             address: "Sandton City Mall, Sandton, Johannesburg, 2196"
           },
           {
+
+            
             listingID: "4",
             listingCompany: "Pick n Pay Rosebank",
             listingStatus: "UNCLAIMED",

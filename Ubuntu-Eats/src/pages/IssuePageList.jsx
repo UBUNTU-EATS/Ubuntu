@@ -12,4 +12,6 @@ const IssuesPageList = ({issues}) => (
     <DataGrid rows={issues} columns={columns} pageSize={5} getRowId={(row) => row.issueID} />
 );
 
+
+
 export default IssuesPageList;

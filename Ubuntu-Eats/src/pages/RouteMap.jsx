@@ -7,6 +7,9 @@ const RouteMap = ({
   destination,
   originLabel = "Start",
   destinationLabel = "End",
+
+
+  
   originIcon = "📍",
   destinationIcon = "🏪",
   mapContainerStyle = { width: "100%", height: "300px" },
