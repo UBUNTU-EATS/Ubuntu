@@ -1,0 +1,85 @@
+/* Container should take the entire screen */
+.auth-container {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100vh;
+  background: #e8f5e9;
+  padding: 2rem;
+}
+
+/* Make the form fill most of the screen */
+.auth-card {
+  background: white;
+  padding: 2rem 3rem;
+  border-radius: 0; /* remove rounded corners to look fullscreen */
+  box-shadow: none; /* remove shadow */
+  width: 100%;
+  max-width: 100%; /* allow it to span full width */
+  min-height: 100vh; /* fill full height */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Headings */
+.auth-card h2 {
+  color: #2e7d32;
+  margin-bottom: 1rem;
+  font-size: 2rem;
+  text-align: center;
+}
+
+.auth-card p {
+  font-size: 1rem;
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+/* Form layout */
+.auth-card form {
+  display: grid;
+  grid-template-columns: 1fr 1fr; /* two-column layout */
+  gap: 1.5rem;
+}
+
+/* Labels span across input fields */
+.auth-card label {
+  font-size: 0.9rem;
+  font-weight: bold;
+  color: #333;
+  display: block;
+  margin-bottom: 0.3rem;
+}
+
+/* Inputs */
+.auth-card input,
+.auth-card textarea {
+  padding: 0.8rem;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 1rem;
+  width: 100%;
+}
+
+.auth-card textarea {
+  resize: vertical;
+  min-height: 100px;
+  grid-column: span 2; /* make textarea span both columns */
+}
+
+/* Submit button */
+.auth-card .cta-btn {
+  background: #2e7d32;
+  color: white;
+  border: none;
+  padding: 1rem;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: 0.3s;
+  grid-column: span 2; /* make button full width across columns */
+}
+
+.auth-card .cta-btn:hover {
+  background: #1b5e20;
+}
