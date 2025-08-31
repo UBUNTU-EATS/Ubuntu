@@ -1,11 +1,11 @@
 import React, { useState } from "react";
-import "../styles/Auth.css";
+import "../styles/signup.css";
 import { auth, db } from "../../firebaseConfig";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 
 const RSignUp = ({ onAlreadyHaveAccountClick }) => {
-  const [receiverType, setReceiverType] = useState("individual"); // default to individual
+  const [receiverType, setReceiverType] = useState("individual"); 
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -72,7 +72,7 @@ const RSignUp = ({ onAlreadyHaveAccountClick }) => {
         status: "pending", // awaiting admin verification
       };
 
-      // Add optional fields based on receiver type
+      // Add optional fields
       if (formData.organization) {
         receiverData.organization = formData.organization;
       }
@@ -105,128 +105,143 @@ const RSignUp = ({ onAlreadyHaveAccountClick }) => {
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-card">
-        <h2>Receiver Sign Up</h2>
-        {error && <p style={{ color: "red" }}>{error}</p>}
-        {success && <p style={{ color: "green" }}>{success}</p>}
+    <section className="signup-container">
+      <h2 className="signup-title">Receiver Sign Up</h2>
+      {error && <p className="signup-error">{error}</p>}
+      {success && <p className="signup-success">{success}</p>}
 
+      <div className="receiver-type-selector">
         <label>Receiver Type</label>
-        <select value={receiverType} onChange={handleReceiverTypeChange}>
+        <select value={receiverType} onChange={handleReceiverTypeChange} className="receiver-type-select">
           <option value="individual">Individual</option>
           <option value="ngo">NGO</option>
           <option value="farmer">Farmer</option>
         </select>
+      </div>
 
-        <form onSubmit={handleSubmit}>
-          <input
-            type="text"
-            name="name"
-            placeholder="Name / Organization"
-            value={formData.name}
-            onChange={handleChange}
-            required
-          />
-          <input
-            type="email"
-            name="email"
-            placeholder="Email Address"
-            value={formData.email}
-            onChange={handleChange}
-            required
-          />
-          <input
-            type="password"
-            name="password"
-            placeholder="Password"
-            value={formData.password}
-            onChange={handleChange}
-            required
-          />
-          <input
-            type="password"
-            name="confirmPassword"
-            placeholder="Confirm Password"
-            value={formData.confirmPassword}
-            onChange={handleChange}
-            required
-          />
-          <input
-            type="text"
-            name="contactPerson"
-            placeholder="Contact Person"
-            value={formData.contactPerson}
-            onChange={handleChange}
-            required
-          />
-          <input
-            type="text"
-            name="phone"
-            placeholder="Phone Number"
-            value={formData.phone}
-            onChange={handleChange}
-            required
-          />
-          <input
-            type="text"
-            name="address"
-            placeholder="Address"
-            value={formData.address}
-            onChange={handleChange}
-            required
-          />
-          <input
-            type="text"
-            name="city"
-            placeholder="City"
-            value={formData.city}
-            onChange={handleChange}
-            required
-          />
-          <input
-            type="text"
-            name="country"
-            placeholder="Country"
-            value={formData.country}
-            onChange={handleChange}
-            required
-          />
-          <input
-            type="text"
-            name="organization"
-            placeholder="Organization (Optional)"
-            value={formData.organization}
-            onChange={handleChange}
-          />
-          <input
-            type="url"
-            name="website"
-            placeholder="Website (Optional)"
-            value={formData.website}
-            onChange={handleChange}
-          />
-          <input
-            type="number"
-            name="maxFoodQuantity"
-            placeholder="Maximum Food Quantity (kg)"
-            value={formData.maxFoodQuantity}
-            onChange={handleChange}
-            required
-          />
-          <input
-            type="text"
-            name="areasOfFocus"
-            placeholder="Areas of Focus"
-            value={formData.areasOfFocus}
-            onChange={handleChange}
-            required
-          />
+      <form onSubmit={handleSubmit} className="signup-form">
+        <input
+          type="text"
+          name="name"
+          placeholder="Name / Organization"
+          value={formData.name}
+          onChange={handleChange}
+          required
+          className="signup-input"
+        />
+        <input
+          type="email"
+          name="email"
+          placeholder="Email Address"
+          value={formData.email}
+          onChange={handleChange}
+          required
+          className="signup-email"
+        />
+        <input
+          type="password"
+          name="password"
+          placeholder="Password"
+          value={formData.password}
+          onChange={handleChange}
+          required
+          className="signup-password"
+        />
+        <input
+          type="password"
+          name="confirmPassword"
+          placeholder="Confirm Password"
+          value={formData.confirmPassword}
+          onChange={handleChange}
+          required
+          className="signup-confirm-password"
+        />
+        <input
+          type="text"
+          name="contactPerson"
+          placeholder="Contact Person"
+          value={formData.contactPerson}
+          onChange={handleChange}
+          required
+          className="signup-input"
+        />
+        <input
+          type="text"
+          name="phone"
+          placeholder="Phone Number"
+          value={formData.phone}
+          onChange={handleChange}
+          required
+          className="signup-input"
+        />
+        <input
+          type="text"
+          name="address"
+          placeholder="Address"
+          value={formData.address}
+          onChange={handleChange}
+          required
+          className="signup-input"
+        />
+        <input
+          type="text"
+          name="city"
+          placeholder="City"
+          value={formData.city}
+          onChange={handleChange}
+          required
+          className="signup-input"
+        />
+        <input
+          type="text"
+          name="country"
+          placeholder="Country"
+          value={formData.country}
+          onChange={handleChange}
+          required
+          className="signup-input"
+        />
+        <input
+          type="text"
+          name="organization"
+          placeholder="Organization (Optional)"
+          value={formData.organization}
+          onChange={handleChange}
+          className="signup-input"
+        />
+        <input
+          type="url"
+          name="website"
+          placeholder="Website (Optional)"
+          value={formData.website}
+          onChange={handleChange}
+          className="signup-input"
+        />
+        <input
+          type="number"
+          name="maxFoodQuantity"
+          placeholder="Maximum Food Quantity (kg)"
+          value={formData.maxFoodQuantity}
+          onChange={handleChange}
+          required
+          className="signup-input"
+        />
+        <input
+          type="text"
+          name="areasOfFocus"
+          placeholder="Areas of Focus"
+          value={formData.areasOfFocus}
+          onChange={handleChange}
+          required
+          className="signup-input"
+        />
 
-          <button type="submit" className="cta-btn">
-            Sign Up
-          </button>
-        </form>
-
+        <button type="submit" className="signup-button">
+          Sign Up
+        </button>
+      </form>
+      
+      <section className="have-account">
         <p>
           Already have an account?{" "}
           <a
@@ -235,12 +250,13 @@ const RSignUp = ({ onAlreadyHaveAccountClick }) => {
               e.preventDefault();
               onAlreadyHaveAccountClick();
             }}
+            className="to-login"
           >
             Login
           </a>
         </p>
-      </div>
-    </div>
+      </section>
+    </section>
   );
 };
 

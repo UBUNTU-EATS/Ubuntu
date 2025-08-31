@@ -1,5 +1,5 @@
-import SignUp from "./Dsignup";
-import Login from "./Dlogin";
+import RSignUp from "./RSignup";
+import Login from "./login";
 import { useState } from "react";
 import "../styles/Auth.css";
 
@@ -26,7 +26,7 @@ const RAuth = () => {
         />
       )}
       {showSignup && (
-        <SignUp
+        <RSignUp
           isActive={showSignup}
           onAlreadyHaveAccountClick={handleAlreadyHaveAccountClick}
         />

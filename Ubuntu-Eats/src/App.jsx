@@ -7,7 +7,7 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import "./App.css";
 import LandingPage from "./pages/LandingPage";
 import DonorDashboard from "./pages/DonorDashboard";
-import ReceiverSignup from "./pages/Recipient";
+import RAuth from "./pages/RAuth";
 import DonorAuth from "./pages/DonorAuth";
 
 import NGODashboard from "./pages/NGODashboard";
@@ -22,7 +22,7 @@ function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/donor-dashboard" element={<DonorDashboard />} />
-        <Route path="/ReceiverSignup" element={<ReceiverSignup />} />
+        <Route path="/RecipientAuth" element={<RAuth />} />
         <Route path="/DonorAuth" element={<DonorAuth />} />
         <Route path="/NGODashboard" element={<NGODashboard />} />
         <Route path="/FoodReceiver" element={<FoodReceiver />} />
