@@ -1,0 +1,140 @@
+.login-container {
+  max-width: 380px;
+  margin: 80px auto;
+  padding: 30px 25px;
+  background: rgba(255, 255, 255, 0.98);
+  border-radius: 18px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  text-align: center;
+}
+
+.login-title {
+  font-size: 30px;
+  font-weight: 600;
+  margin-bottom: 25px;
+  color: #1a1a1a;
+}
+
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+
+.login-email,
+.login-password {
+  padding: 12px 16px;
+  border: 1px solid #ccc;
+  border-radius: 12px;
+  font-size: 15px;
+  transition: border-color 0.3s ease;
+}
+
+.login-email:focus,
+.login-password:focus {
+  outline: none;
+  border-color: #2e7d32;
+}
+
+
+.login-submit,
+.google-signin {
+  padding: 12px;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 500;
+  transition: background 0.3s ease;
+}
+
+.login-submit {
+  background-color: #2e7d32;
+  color: #fff;
+}
+
+.login-submit:hover {
+  background-color: #2e7d32;
+}
+
+.google-signin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: #ffffff;
+  color: #333;
+  border: 1px solid #ddd;
+}
+
+.google-signin:hover {
+  background-color: #f5f5f5;
+}
+
+.google-signin img {
+  width: 20px;
+  height: 20px;
+}
+
+.login-error {
+  color: #e63946;
+  font-size: 14px;
+  margin-top: 8px;
+}
+
+.no-account {
+  margin-top: 20px;
+  font-size: 14px;
+  color: #555;
+}
+
+.no-account a {
+  color: #2e7d32;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.no-account a:hover {
+  text-decoration: underline;
+}
+
+@media(max-width:600px) {
+
+    .login-container {
+    max-width: 250px;
+    margin: 80px auto;
+    padding: 10px 20px;
+    background: rgba(255, 255, 255, 0.98);
+    border-radius: 18px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    text-align: center;
+    }
+
+    .login-title {
+    font-size: 25px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    color: #1a1a1a;
+    }
+
+    .login-submit,
+    .google-signin {
+    padding: 10px;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 500;
+    transition: background 0.3s ease;
+    }
+    .login-email,
+    .login-password {
+    padding: 10px 16px;
+    border: 1px solid #ccc;
+    border-radius: 12px;
+    font-size: 15px;
+    transition: border-color 0.3s ease;
+    }
+}

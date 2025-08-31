@@ -1,0 +1,126 @@
+.signup-container {
+  max-width: 380px;
+  margin: 80px auto;
+  padding: 30px 25px;
+  background: rgba(255, 255, 255, 0.98);
+  border-radius: 18px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  text-align: center;
+}
+
+
+.signup-title {
+  font-size: 30px;
+  font-weight: 600;
+  margin-bottom: 25px;
+  color: #2e7d32;
+}
+
+.signup-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+
+.signup-email,
+.signup-password,
+.signup-confirm-password {
+  padding: 12px 16px;
+  border: 1px solid #ccc;
+  border-radius: 12px;
+  font-size: 15px;
+  transition: border-color 0.3s ease;
+}
+
+.signup-email:focus,
+.signup-password:focus,
+.signup-confirm-password:focus {
+  outline: none;
+  border-color: #2e7d32;
+}
+
+
+.signup-button {
+  padding: 12px;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 500;
+  background-color: #2e7d32;
+  color: #fff;
+  transition: background 0.3s ease;
+}
+
+.signup-button:hover {
+  background-color: #2e7d32;
+}
+
+
+.signup-error {
+  color: #e63946;
+  font-size: 14px;
+  margin-top: 8px;
+}
+.signup-success {
+  color: #2ecc71;
+  font-size: 14px;
+  margin-top: 8px;
+}
+
+
+.have-account {
+  margin-top: 20px;
+  font-size: 14px;
+  color: #555;
+}
+
+.have-account a {
+  color: #2e7d32;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.have-account a:hover {
+  text-decoration: underline;
+}
+
+@media(max-width:600px){
+    .signup-container {
+    max-width: 250px;
+    margin: 80px auto;
+    padding: 10px 20px;
+    background: rgba(255, 255, 255, 0.98);
+    border-radius: 18px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    text-align: center;
+    }
+    .signup-button {
+    padding: 10px;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 500;
+    background-color: #2e7d32;
+    color: #fff;
+    transition: background 0.3s ease;
+    }
+
+    .signup-email,
+    .signup-password,
+    .signup-confirm-password {
+    padding: 10px 16px;
+    border: 1px solid #ccc;
+    border-radius: 12px;
+    font-size: 15px;
+    transition: border-color 0.3s ease;
+    }
+    .signup-title {
+    font-size: 25px;
+    font-weight: 600;
+    margin-bottom: 25px;
+    color: #1a1a1a;
+    }
+}

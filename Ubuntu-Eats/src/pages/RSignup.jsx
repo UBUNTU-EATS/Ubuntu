@@ -1,24 +1,25 @@
 import React, { useState } from "react";
-import { auth, db } from "../firebase";
+import "../styles/Auth.css";
+import { auth, db } from "../../firebaseConfig";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
-import "../styles/Auth.css";
 
-const DonorSignup = () => {
-  const [donorType, setDonorType] = useState("individual"); // default to individual
+const RSignUp = ({ onAlreadyHaveAccountClick }) => {
+  const [receiverType, setReceiverType] = useState("individual"); // default to individual
   const [formData, setFormData] = useState({
-    fullName: "",
+    name: "",
     email: "",
     password: "",
     confirmPassword: "",
     phone: "",
     address: "",
+    city: "",
     country: "",
-    preferredDonationType: "",
-    idNumber: "",
-    companyName: "",
-    companyRegNumber: "",
-    companyWebsite: "",
+    organization: "",
+    contactPerson: "",
+    website: "",
+    maxFoodQuantity: "",
+    areasOfFocus: "",
   });
 
   const [error, setError] = useState("");
@@ -32,8 +33,8 @@ const DonorSignup = () => {
     }));
   };
 
-  const handleDonorTypeChange = (e) => {
-    setDonorType(e.target.value);
+  const handleReceiverTypeChange = (e) => {
+    setReceiverType(e.target.value);
   };
 
   const handleSubmit = async (e) => {
@@ -55,44 +56,48 @@ const DonorSignup = () => {
       );
       const user = userCredential.user;
 
-      // Build data based on donor type
-      const donorData = {
-        donorType,
-        fullName: formData.fullName,
+      // Build receiver data
+      const receiverData = {
+        receiverType,
+        name: formData.name,
         email: formData.email,
         phone: formData.phone,
         address: formData.address,
+        city: formData.city,
         country: formData.country,
-        preferredDonationType: formData.preferredDonationType,
+        contactPerson: formData.contactPerson,
+        maxFoodQuantity: formData.maxFoodQuantity,
+        areasOfFocus: formData.areasOfFocus,
         createdAt: new Date(),
-        verified: false,
+        status: "pending", // awaiting admin verification
       };
 
-      if (donorType === "individual") {
-        donorData.idNumber = formData.idNumber;
-      } else if (donorType === "company") {
-        donorData.companyName = formData.companyName;
-        donorData.companyRegNumber = formData.companyRegNumber;
-        donorData.companyWebsite = formData.companyWebsite;
+      // Add optional fields based on receiver type
+      if (formData.organization) {
+        receiverData.organization = formData.organization;
+      }
+      if (formData.website) {
+        receiverData.website = formData.website;
       }
 
-      // Save donor data in Firestore
-      await setDoc(doc(db, "donors", user.uid), donorData);
+      // Save receiver data in Firestore
+      await setDoc(doc(db, "receivers", user.uid), receiverData);
 
-      setSuccess("Donor registered successfully! Awaiting admin verification.");
+      setSuccess("Receiver registered successfully! Awaiting admin verification.");
       setFormData({
-        fullName: "",
+        name: "",
         email: "",
         password: "",
         confirmPassword: "",
         phone: "",
         address: "",
+        city: "",
         country: "",
-        preferredDonationType: "",
-        idNumber: "",
-        companyName: "",
-        companyRegNumber: "",
-        companyWebsite: "",
+        organization: "",
+        contactPerson: "",
+        website: "",
+        maxFoodQuantity: "",
+        areasOfFocus: "",
       });
     } catch (err) {
       setError(err.message);
@@ -102,22 +107,23 @@ const DonorSignup = () => {
   return (
     <div className="auth-container">
       <div className="auth-card">
-        <h2>Donor Sign Up</h2>
+        <h2>Receiver Sign Up</h2>
         {error && <p style={{ color: "red" }}>{error}</p>}
         {success && <p style={{ color: "green" }}>{success}</p>}
 
-        <label>Donor Type</label>
-        <select value={donorType} onChange={handleDonorTypeChange}>
+        <label>Receiver Type</label>
+        <select value={receiverType} onChange={handleReceiverTypeChange}>
           <option value="individual">Individual</option>
-          <option value="company">Company</option>
+          <option value="ngo">NGO</option>
+          <option value="farmer">Farmer</option>
         </select>
 
         <form onSubmit={handleSubmit}>
           <input
             type="text"
-            name="fullName"
-            placeholder="Full Name"
-            value={formData.fullName}
+            name="name"
+            placeholder="Name / Organization"
+            value={formData.name}
             onChange={handleChange}
             required
           />
@@ -147,6 +153,14 @@ const DonorSignup = () => {
           />
           <input
             type="text"
+            name="contactPerson"
+            placeholder="Contact Person"
+            value={formData.contactPerson}
+            onChange={handleChange}
+            required
+          />
+          <input
+            type="text"
             name="phone"
             placeholder="Phone Number"
             value={formData.phone}
@@ -163,74 +177,71 @@ const DonorSignup = () => {
           />
           <input
             type="text"
+            name="city"
+            placeholder="City"
+            value={formData.city}
+            onChange={handleChange}
+            required
+          />
+          <input
+            type="text"
             name="country"
             placeholder="Country"
             value={formData.country}
             onChange={handleChange}
             required
           />
-          <select
-            name="preferredDonationType"
-            value={formData.preferredDonationType}
+          <input
+            type="text"
+            name="organization"
+            placeholder="Organization (Optional)"
+            value={formData.organization}
+            onChange={handleChange}
+          />
+          <input
+            type="url"
+            name="website"
+            placeholder="Website (Optional)"
+            value={formData.website}
+            onChange={handleChange}
+          />
+          <input
+            type="number"
+            name="maxFoodQuantity"
+            placeholder="Maximum Food Quantity (kg)"
+            value={formData.maxFoodQuantity}
             onChange={handleChange}
             required
-          >
-            <option value="">Preferred Donation Type</option>
-            <option value="monetary">Monetary</option>
-            <option value="food">Food</option>
-            <option value="clothes">Clothes</option>
-            <option value="services">Services</option>
-            <option value="other">Other</option>
-          </select>
-
-          {/* Individual Fields */}
-          {donorType === "individual" && (
-            <input
-              type="text"
-              name="idNumber"
-              placeholder="ID / Passport Number"
-              value={formData.idNumber}
-              onChange={handleChange}
-              required
-            />
-          )}
-
-          {/* Company Fields */}
-          {donorType === "company" && (
-            <>
-              <input
-                type="text"
-                name="companyName"
-                placeholder="Company Name"
-                value={formData.companyName}
-                onChange={handleChange}
-                required
-              />
-              <input
-                type="text"
-                name="companyRegNumber"
-                placeholder="Company Registration Number"
-                value={formData.companyRegNumber}
-                onChange={handleChange}
-                required
-              />
-              <input
-                type="text"
-                name="companyWebsite"
-                placeholder="Company Website"
-                value={formData.companyWebsite}
-                onChange={handleChange}
-              />
-            </>
-          )}
+          />
+          <input
+            type="text"
+            name="areasOfFocus"
+            placeholder="Areas of Focus"
+            value={formData.areasOfFocus}
+            onChange={handleChange}
+            required
+          />
 
           <button type="submit" className="cta-btn">
             Sign Up
           </button>
         </form>
+
+        <p>
+          Already have an account?{" "}
+          <a
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              onAlreadyHaveAccountClick();
+            }}
+          >
+            Login
+          </a>
+        </p>
       </div>
     </div>
   );
 };
 
-export default DonorSignup;
+export default RSignUp;
