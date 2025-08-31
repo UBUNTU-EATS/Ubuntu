@@ -10,7 +10,7 @@ import LandingChoice from "./pages/LandingChoice";
 import DonorDashboard from "./pages/DonorDashboard";
 import RAuth from "./pages/RAuth";
 import DonorAuth from "./pages/DonorAuth";
-
+import LoginAuth from "./pages/loginAuth";
 import NGODashboard from "./pages/NGODashboard";
 
 import NGOProfile from "./pages/NGOProfile";
@@ -23,6 +23,8 @@ import VolunteerProfile from "./pages/VolunteerProfile";
 import MyDeliveries from "./pages/MyDeliveries";
 import AvailableDeliveries from "./pages/AvailableDeliveries";
 
+
+
 function App() {
   return (
     <Router>
@@ -32,9 +34,10 @@ function App() {
         <Route path="/donor-dashboard" element={<DonorDashboard />} />
         <Route path="/RecipientAuth" element={<RAuth />} />
         <Route path="/DonorAuth" element={<DonorAuth />} />
+        <Route path="/login" element={<LoginAuth />} />
         <Route path="/NGODashboard" element={<NGODashboard />} />
         <Route path="/FoodReceiver" element={<FoodReceiver />} />
-
+        
         <Route path="/NGOProfile" element={<NGOProfile />} />
         <Route path="/ClaimedDonations" element={<ClaimedDonations />} />
 

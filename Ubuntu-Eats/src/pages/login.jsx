@@ -30,21 +30,6 @@ const Login = ({ onCreateAccountClick }) => {
     }
   };
 
-  const handleGoogleSignIn = async () => {
-    const provider = new GoogleAuthProvider();
-
-    try {
-      const result = await signInWithPopup(auth, provider);
-      navigate("/home");
-      const user = result.user;
-    } catch (err) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("An unknown error occurred during Google sign-in");
-      }
-    }
-  };
 
   return (
     <section className="login-container">

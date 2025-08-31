@@ -42,7 +42,7 @@ const LandingChoice = () => {
             <p>Restaurants, shops, or individuals with surplus food.</p>
             <button
               className="cta-btn"
-              onClick={() => navigate("/signup-donor")}
+              onClick={() => navigate("/DonorAuth")}
             >
               Sign up as Donor
             </button>
@@ -51,7 +51,7 @@ const LandingChoice = () => {
           <div className="feature-card">
             <h4>NGO / Farmer</h4>
             <p>Organizations and farmers who distribute food aid.</p>
-            <button className="cta-btn" onClick={() => navigate("/signup-ngo")}>
+            <button className="cta-btn" onClick={() => navigate("/RecipientAuth")}>
               Sign up as NGO / Farmer
             </button>
           </div>
@@ -61,7 +61,7 @@ const LandingChoice = () => {
             <p>Help us collect and deliver food to those in need.</p>
             <button
               className="cta-btn"
-              onClick={() => navigate("/signup-volunteer")}
+              onClick={() => navigate("/VolunteerSignup")}
             >
               Sign up as Volunteer
             </button>

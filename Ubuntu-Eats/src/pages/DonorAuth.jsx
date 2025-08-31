@@ -4,8 +4,8 @@ import { useState } from "react";
 import "../styles/Auth.css";
 
 const DonorAuth = () => {
-  const [showLogin, setShowLogin] = useState(true); 
-  const [showSignup, setShowSignup] = useState(false);
+  const [showLogin, setShowLogin] = useState(false); 
+  const [showSignup, setShowSignup] = useState(true);
 
   const handleCreateAccountClick = () => {
     setShowSignup(true);

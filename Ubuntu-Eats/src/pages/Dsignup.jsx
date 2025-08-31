@@ -5,7 +5,7 @@ import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 
 const DSignUp = ({ onAlreadyHaveAccountClick }) => {
-  const [donorType, setDonorType] = useState("individual"); // default to individual
+  const [donorType, setDonorType] = useState("individual");
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
