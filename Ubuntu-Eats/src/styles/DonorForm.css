@@ -1,0 +1,477 @@
+.donation-form-container {
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+  border-radius: 24px;
+  padding: 3rem;
+  box-shadow: 
+    0 25px 50px -12px rgba(0, 0, 0, 0.08),
+    0 0 0 1px rgba(46, 125, 50, 0.05);
+  position: relative;
+  overflow: hidden;
+  margin: 2rem auto;
+  max-width: 1000px;
+  animation: slideInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1) backwards;
+  transform-origin: center bottom;
+}
+
+/* Subtle animated background pattern */
+.donation-form-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at 20% 80%, rgba(46, 125, 50, 0.04) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(255, 204, 0, 0.04) 0%, transparent 50%),
+    linear-gradient(135deg, rgba(46, 125, 50, 0.01) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.donation-form-container > * {
+  position: relative;
+  z-index: 1;
+}
+
+
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+
+
+
+/* Enhanced header with gradient text and modern styling */
+.form-header {
+  margin-bottom: 3rem;
+  text-align: center;
+  position: relative;
+}
+
+.form-header::after {
+  content: '';
+  position: absolute;
+  bottom: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100px;
+  height: 4px;
+  background: linear-gradient(90deg, #2e7d32, #ffcc00, #2e7d32);
+  border-radius: 2px;
+  animation: shimmer 2s ease-in-out infinite alternate;
+}
+
+@keyframes shimmer {
+  0% { opacity: 0.7; }
+  100% { opacity: 1; }
+}
+
+.form-header h2 {
+  color: #1a365d;
+  margin-bottom: 1rem;
+  font-size: 2.8rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #2e7d32 0%, #388e3c 50%, #ffcc00 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.5px;
+}
+
+.form-header p {
+  color: #4a5568;
+  font-size: 1.3rem;
+  font-weight: 500;
+  line-height: 1.7;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* Modern section styling with glass-morphism effect */
+.donation-form .form-section {
+  margin-bottom: 2.5rem;
+  padding: 2.5rem;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 20px;
+  border: 1px solid rgba(46, 125, 50, 0.1);
+  backdrop-filter: blur(10px);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.donation-form .form-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #2e7d32, #ffcc00);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.donation-form .form-section:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px -8px rgba(46, 125, 50, 0.15);
+  border-color: rgba(46, 125, 50, 0.2);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.donation-form .form-section:hover::before {
+  opacity: 1;
+}
+
+.donation-form .form-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.donation-form .form-section h3 {
+  color: #2d3748;
+  margin-bottom: 2rem;
+  font-size: 1.6rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Add icons to section headers */
+.donation-form .form-section h3::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2e7d32, #ffcc00);
+  box-shadow: 0 0 0 4px rgba(46, 125, 50, 0.1);
+}
+
+/* Enhanced form grid with better spacing */
+.donation-form .form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+.donation-form .form-group {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.donation-form .form-group.full-width {
+  grid-column: 1 / -1;
+}
+
+/* Modern labels with better typography */
+.donation-form .form-group label {
+  color: #2d3748;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  font-size: 1rem;
+  letter-spacing: 0.3px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Add subtle required indicators */
+.donation-form .form-group label::after {
+  content: '';
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #e53e3e;
+  margin-left: auto;
+}
+
+/* Enhanced input styling with modern focus effects */
+.donation-form .form-group input,
+.donation-form .form-group select,
+.donation-form .form-group textarea {
+  padding: 1rem 1.25rem;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 500;
+  font-family: inherit;
+  background: rgba(255, 255, 255, 0.9);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  color: black;
+}
+
+.donation-form .form-group input:focus,
+.donation-form .form-group select:focus,
+.donation-form .form-group textarea:focus {
+  outline: none;
+  border-color: #2e7d32;
+  box-shadow: 
+    0 0 0 4px rgba(46, 125, 50, 0.1),
+    0 4px 12px rgba(46, 125, 50, 0.15);
+  background: #ffffff;
+  transform: translateY(-1px);
+  color: black;
+}
+
+.donation-form .form-group input::placeholder,
+.donation-form .form-group textarea::placeholder {
+  color: #a0aec0;
+  font-weight: 400;
+}
+
+/* Enhanced image upload area with modern styling */
+.image-upload-area {
+  border: 3px dashed #cbd5e0;
+  border-radius: 20px;
+  padding: 4rem 2rem;
+  text-align: center;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.image-upload-area::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(46, 125, 50, 0.02) 0%, transparent 70%);
+  transition: transform 0.4s ease;
+}
+
+.image-upload-area:hover,
+.image-upload-area.drag-active {
+  border-color: #2e7d32;
+  background: linear-gradient(135deg, #f0fff4 0%, #e6fffa 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(46, 125, 50, 0.15);
+}
+
+.image-upload-area:hover::before {
+  transform: scale(1.1);
+}
+
+.upload-label {
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  position: relative;
+  z-index: 1;
+}
+
+.upload-icon {
+  font-size: 4rem;
+  opacity: 0.7;
+  transition: all 0.3s ease;
+  filter: drop-shadow(0 4px 8px rgba(46, 125, 50, 0.1));
+}
+
+.image-upload-area:hover .upload-icon {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.upload-label p {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #2d3748;
+  line-height: 1.4;
+}
+
+.upload-label small {
+  color: #718096;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+/* Enhanced image preview grid */
+.image-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 1.5rem;
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background: rgba(248, 250, 252, 0.8);
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+}
+
+.image-preview {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 2px solid #e2e8f0;
+  transition: all 0.3s ease;
+  background: #ffffff;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+.image-preview:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  border-color: #2e7d32;
+}
+
+.image-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.image-preview:hover img {
+  transform: scale(1.05);
+}
+
+/* Enhanced remove button */
+.remove-image {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: rgba(239, 68, 68, 0.9);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+}
+
+.remove-image:hover {
+  background: rgba(220, 38, 38, 0.95);
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+}
+
+/* Enhanced submit button with gradient and animations */
+.submit-btn {
+  background: linear-gradient(135deg, #2e7d32 0%, #388e3c 50%, #4caf50 100%);
+  color: white;
+  border: none;
+  padding: 1.25rem 3rem;
+  border-radius: 16px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  width: 100%;
+  max-width: 400px;
+  margin: 2rem auto 0;
+  display: block;
+  position: relative;
+  overflow: hidden;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.submit-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.6s ease;
+}
+
+.submit-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 
+    0 15px 35px rgba(46, 125, 50, 0.4),
+    0 5px 15px rgba(0, 0, 0, 0.1);
+  background: linear-gradient(135deg, #1b5e20 0%, #2e7d32 50%, #388e3c 100%);
+}
+
+.submit-btn:hover::before {
+  left: 100%;
+}
+
+.submit-btn:active {
+  transform: translateY(-1px);
+}
+
+/* Enhanced form actions */
+.form-actions {
+  text-align: center;
+  padding-top: 2rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+/* Responsive design improvements */
+@media (max-width: 768px) {
+  .donation-form-container {
+    padding: 2rem 1.5rem;
+    margin: 1rem;
+    border-radius: 20px;
+  }
+  
+  .form-header h2 {
+    font-size: 2.2rem;
+  }
+  
+  .donation-form .form-grid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+  
+  .donation-form .form-section {
+    padding: 2rem 1.5rem;
+  }
+  
+  .image-upload-area {
+    padding: 3rem 1.5rem;
+  }
+  
+  .submit-btn {
+    padding: 1rem 2rem;
+    font-size: 1.1rem;
+  }
+}
+
+/* Add loading state for submit button */
+.submit-btn:disabled {
+  background: #cbd5e0;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Smooth scrolling for form sections */
+.donation-form {
+  scroll-behavior: smooth;
+}
+
+/* Add focus-visible for better accessibility */
+.donation-form *:focus-visible {
+  outline: 2px solid #2e7d32;
+  outline-offset: 2px;
+}
