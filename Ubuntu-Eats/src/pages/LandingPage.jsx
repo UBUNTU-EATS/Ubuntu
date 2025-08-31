@@ -72,8 +72,8 @@ const LandingPage = () => {
         <Link to="/donor-dashboard">
           <button className="cta-btn">Get Started</button>
         </Link>
-        <Link to="/DonorSignup">
-          <button className="cta-btn">DonorSignup</button>
+        <Link to="/ReceiverSignup">
+          <button className="cta-btn">ReceiverSignup</button>
         </Link>
       </section>
 

@@ -5,12 +5,12 @@ import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import "../styles/Auth.css";
 
-const NGOSignup = () => {
+const ReceiverSignup = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    orgName: "",
-    regNumber: "",
-    mission: "",
+    receiverType: "individual", // default
+    name: "",
+    organization: "",
     contactPerson: "",
     phone: "",
     email: "",
@@ -20,7 +20,7 @@ const NGOSignup = () => {
     city: "",
     country: "",
     website: "",
-    yearEstablished: "",
+    maxFoodQuantity: "", // quantity they can handle
     areasOfFocus: "",
   });
 
@@ -47,11 +47,11 @@ const NGOSignup = () => {
       );
       const user = userCredential.user;
 
-      // 2) Save NGO profile in Firestore
-      await setDoc(doc(db, "ngos", user.uid), {
-        orgName: formData.orgName,
-        regNumber: formData.regNumber,
-        mission: formData.mission,
+      // 2) Save Receiver profile in Firestore
+      await setDoc(doc(db, "receivers", user.uid), {
+        receiverType: formData.receiverType,
+        name: formData.name,
+        organization: formData.organization,
         contactPerson: formData.contactPerson,
         phone: formData.phone,
         email: formData.email,
@@ -59,14 +59,14 @@ const NGOSignup = () => {
         city: formData.city,
         country: formData.country,
         website: formData.website,
-        yearEstablished: formData.yearEstablished,
+        maxFoodQuantity: formData.maxFoodQuantity,
         areasOfFocus: formData.areasOfFocus,
-        status: "pending", // for admin to approve
+        status: "pending", // admin verification
         createdAt: serverTimestamp(),
       });
 
-      alert("NGO registered successfully! Pending admin verification.");
-      navigate("/ngo-login");
+      alert("Receiver registered successfully! Pending admin verification.");
+      navigate("/receiver-login");
     } catch (err) {
       console.error(err);
       alert(err.message);
@@ -76,30 +76,24 @@ const NGOSignup = () => {
   return (
     <div className="auth-container">
       <div className="auth-card">
-        <h2>NGO Registration</h2>
+        <h2>Receiver Sign Up</h2>
         <form onSubmit={handleSubmit}>
-          <label>Organization Name</label>
+          <label>Receiver Type</label>
+          <select
+            name="receiverType"
+            value={formData.receiverType}
+            onChange={handleChange}
+          >
+            <option value="individual">Individual</option>
+            <option value="ngo">NGO</option>
+            <option value="farmer">Farmer</option>
+          </select>
+
+          <label>Name / Organization</label>
           <input
             type="text"
-            name="orgName"
-            value={formData.orgName}
-            onChange={handleChange}
-            required
-          />
-
-          <label>Registration Number</label>
-          <input
-            type="text"
-            name="regNumber"
-            value={formData.regNumber}
-            onChange={handleChange}
-            required
-          />
-
-          <label>Mission Statement</label>
-          <textarea
-            name="mission"
-            value={formData.mission}
+            name="name"
+            value={formData.name}
             onChange={handleChange}
             required
           />
@@ -181,12 +175,13 @@ const NGOSignup = () => {
             onChange={handleChange}
           />
 
-          <label>Year Established</label>
+          <label>Maximum Food Quantity (kg)</label>
           <input
             type="number"
-            name="yearEstablished"
-            value={formData.yearEstablished}
+            name="maxFoodQuantity"
+            value={formData.maxFoodQuantity}
             onChange={handleChange}
+            required
           />
 
           <label>Areas of Focus</label>
@@ -198,15 +193,15 @@ const NGOSignup = () => {
           />
 
           <button type="submit" className="cta-btn">
-            Register NGO
+            Register Receiver
           </button>
         </form>
         <p>
-          Already registered? <Link to="/ngo-login">Login here</Link>
+          Already registered? <Link to="/receiver-login">Login here</Link>
         </p>
       </div>
     </div>
   );
 };
 
-export default NGOSignup;
+export default ReceiverSignup;
