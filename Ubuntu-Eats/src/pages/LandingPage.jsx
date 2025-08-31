@@ -75,7 +75,7 @@ const LandingPage = () => {
 
         <Link to="/DonorAuth">
           <button className="cta-btn">Donor startup</button>
-
+        </Link>
         <Link to="/LandingChoice">
           <button className="cta-btn">LandingChoice</button>
 

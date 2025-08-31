@@ -1,14 +1,13 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import {getFirestore} from "firebase/firestore";
-
 const firebaseConfig = {
-  apiKey: "AIzaSyDGsQG8-0j79bK3_fzM_gCyt90IpIOvmd8",
-  authDomain: "ubuntu-eats.firebaseapp.com",
-  projectId: "ubuntu-eats",
-  storageBucket: "ubuntu-eats.firebasestorage.app",
-  messagingSenderId: "655680348525",
-  appId: "1:655680348525:web:9826e304f50e5c4b28fa64"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
 // Debug: Check if config values are loaded
