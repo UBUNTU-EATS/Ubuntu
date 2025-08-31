@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import Login from "./Login";
+import Login from "./login";
 import UnifiedSignup from "./UnifiedSignup";
 import "../styles/Auth.css";
 
@@ -18,14 +18,16 @@ const AuthContainer = () => {
   };
 
   return (
-    <main className="auth-container">
-      {showLogin && <Login onCreateAccountClick={handleCreateAccountClick} />}
-      {showSignup && (
-        <UnifiedSignup
-          onAlreadyHaveAccountClick={handleAlreadyHaveAccountClick}
-        />
-      )}
-    </main>
+    <div className="authentication-page">
+      <main className="auth-container">
+        {showLogin && <Login onCreateAccountClick={handleCreateAccountClick} />}
+        {showSignup && (
+          <UnifiedSignup
+            onAlreadyHaveAccountClick={handleAlreadyHaveAccountClick}
+          />
+        )}
+      </main>
+    </div>
   );
 };
 

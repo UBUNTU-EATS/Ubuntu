@@ -1,105 +1,59 @@
 import React, { useState } from "react";
-import {
-  signInWithEmailAndPassword,
-  GoogleAuthProvider,
-  signInWithPopup,
-} from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
-import { auth, db } from "../../firebaseConfig";
 import { useNavigate } from "react-router-dom";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth, db } from "../../firebaseConfig";
+import { doc, getDoc } from "firebase/firestore";
 import "../styles/login.css";
 
-const Login = ({ onCreateAccountClick }) => {
+const Login = ({ onNoAccountClick }) => {
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = async (event) => {
-    event.preventDefault();
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
 
     try {
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // Check account type in Firestore
-      let accountType = null;
+      // Fetch user data from Firestore
+      const userRef = doc(db, "users", email);
+      const userSnap = await getDoc(userRef);
 
-      // Check in donors collection
-      const donorDoc = await getDoc(doc(db, "donors", user.uid));
-      if (donorDoc.exists()) {
-        accountType = donorDoc.data().accountType;
-      }
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        const role = userData.role;
 
-      // If not found in donors, check in ngos collection
-      if (!accountType) {
-        const ngoDoc = await getDoc(doc(db, "ngos", user.uid));
-        if (ngoDoc.exists()) {
-          accountType = "ngo";
-        }
-      }
-
-      // If not found in ngos, check in farmers collection
-      if (!accountType) {
-        const farmerDoc = await getDoc(doc(db, "farmers", user.uid));
-        if (farmerDoc.exists()) {
-          accountType = "farmer";
-        }
-      }
-
-      // If not found in farmers, check in volunteers collection
-      if (!accountType) {
-        const volunteerDoc = await getDoc(doc(db, "volunteers", user.uid));
-        if (volunteerDoc.exists()) {
-          accountType = "volunteer";
-        }
-      }
-
-      // Redirect based on account type
-      if (accountType) {
-        switch (accountType) {
-          case "individual":
-          case "company":
-            navigate("/donor-dashboard");
-            break;
-          case "ngo":
-            navigate("/NGODashboard");
-            break;
-          case "farmer":
-            navigate("/NGODashboard");
-            break;
-          case "volunteer":
-            navigate("/VolunteerDashboard");
-            break;
-          default:
-            navigate("/LandingPage");
+        // Navigate based on role
+        if (role === "individual" || role === "company" || role === "farmer") {
+          navigate("/donor-dashboard");
+        } else if (role === "volunteer") {
+          navigate("/VolunteerDashboard");
+        } else if (role === "ngo") {
+          navigate("/NGODashboard");
+        } else {
+          setError("Unknown role. Please contact admin.");
         }
       } else {
-        setError("Account type not found. Please contact support.");
+        setError("User data not found.");
       }
     } catch (err) {
       setError(err.message);
-    }
-  };
-
-  const handleGoogleSignIn = async () => {
-    const provider = new GoogleAuthProvider();
-
-    try {
-      const result = await signInWithPopup(auth, provider);
-      navigate("/home");
-    } catch (err) {
-      setError(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <section className="login-container">
       <h2 className="login-title">Login</h2>
+      {error && <p className="login-error">{error}</p>}
+
       <form onSubmit={handleLogin} className="login-form">
         <input
           type="email"
@@ -117,37 +71,24 @@ const Login = ({ onCreateAccountClick }) => {
           required
           className="login-password"
         />
-        <button type="submit" className="login-submit">
-          Login
+
+        <button type="submit" className="login-submit" disabled={loading}>
+          {loading ? "Logging in..." : "Login"}
         </button>
-        <button
-          type="button"
-          onClick={handleGoogleSignIn}
-          className="google-signin"
-        >
-          <img
-            src="https://th.bing.com/th/id/OIP.Din44az7iZZDfbsrD1kfGQHaHa?rs=1&pid=ImgDetMain"
-            alt="Google Logo"
-          />
-          Sign in with Google
-        </button>
-        {error && <p className="login-error">{error}</p>}
       </form>
-      <section className="no-account">
-        <p>
-          Don't have an account?{" "}
-          <a
-            href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              onCreateAccountClick();
-            }}
-            className="to-signup"
-          >
-            Create an account
-          </a>
-        </p>
-      </section>
+
+      <p className="no-account">
+        Don’t have an account?{" "}
+        <a
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            if (onNoAccountClick) onNoAccountClick();
+          }}
+        >
+          Sign Up
+        </a>
+      </p>
     </section>
   );
 };

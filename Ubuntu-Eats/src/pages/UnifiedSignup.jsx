@@ -9,7 +9,6 @@ const UnifiedSignup = ({ onAlreadyHaveAccountClick }) => {
   const navigate = useNavigate();
   const [accountType, setAccountType] = useState("individual");
   const [formData, setFormData] = useState({
-    // Common fields
     name: "",
     email: "",
     password: "",
@@ -18,30 +17,19 @@ const UnifiedSignup = ({ onAlreadyHaveAccountClick }) => {
     address: "",
     city: "",
     country: "",
-
-    // Individual donor fields
     idNumber: "",
-    preferredDonationType: "",
-
-    // Company donor fields
     companyName: "",
     companyRegNumber: "",
     companyWebsite: "",
-
-    // NGO fields
     registrationNumber: "",
     contactPerson: "",
     website: "",
     beneficiaries: "",
     areasOfFocus: "",
-
-    // Farmer fields
     farmName: "",
     farmSize: "",
     cropType: "",
     maxFoodQuantity: "",
-
-    // Volunteer fields
     vehicleType: "",
     availability: "",
     maxDistance: "",
@@ -57,23 +45,18 @@ const UnifiedSignup = ({ onAlreadyHaveAccountClick }) => {
   };
 
   const validateForm = () => {
-    // Password validation
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords do not match.");
       return false;
     }
-
     if (formData.password.length < 6) {
       setError("Password should be at least 6 characters.");
       return false;
     }
-
-    // Account type specific validations
     if (accountType === "individual" && !formData.idNumber) {
       setError("ID/Passport number is required for individuals.");
       return false;
     }
-
     if (
       accountType === "company" &&
       (!formData.companyName || !formData.companyRegNumber)
@@ -83,7 +66,6 @@ const UnifiedSignup = ({ onAlreadyHaveAccountClick }) => {
       );
       return false;
     }
-
     if (
       accountType === "ngo" &&
       (!formData.registrationNumber || !formData.contactPerson)
@@ -91,7 +73,6 @@ const UnifiedSignup = ({ onAlreadyHaveAccountClick }) => {
       setError("Registration number and contact person are required for NGOs.");
       return false;
     }
-
     if (
       accountType === "farmer" &&
       (!formData.farmName || !formData.farmSize)
@@ -99,7 +80,6 @@ const UnifiedSignup = ({ onAlreadyHaveAccountClick }) => {
       setError("Farm name and size are required for farmers.");
       return false;
     }
-
     if (
       accountType === "volunteer" &&
       (!formData.vehicleType || !formData.availability)
@@ -107,7 +87,6 @@ const UnifiedSignup = ({ onAlreadyHaveAccountClick }) => {
       setError("Vehicle type and availability are required for volunteers.");
       return false;
     }
-
     return true;
   };
 
@@ -123,7 +102,6 @@ const UnifiedSignup = ({ onAlreadyHaveAccountClick }) => {
     }
 
     try {
-      // Create user in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         formData.email,
@@ -131,82 +109,61 @@ const UnifiedSignup = ({ onAlreadyHaveAccountClick }) => {
       );
       const user = userCredential.user;
 
-      // Common data for all account types
-      let userData = {
-        accountType,
+      // Determine donor/recipient flags
+      let isDonor = false;
+      let isRecipient = false;
+
+      if (accountType === "individual" || accountType === "company") {
+        isDonor = true;
+      } else if (accountType === "farmer") {
+        isDonor = true;
+        isRecipient = true;
+      } else if (accountType === "ngo") {
+        isRecipient = true;
+      } // volunteer stays false for both
+
+      const userData = {
+        role: accountType,
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
         address: formData.address,
         city: formData.city,
         country: formData.country,
+        isDonor,
+        isRecipient,
         createdAt: serverTimestamp(),
-        status: "pending", // For admin verification
+        status: "pending",
       };
 
-      // Add account type specific data
-      switch (accountType) {
-        case "individual":
-          userData = {
-            ...userData,
-            idNumber: formData.idNumber,
-            preferredDonationType: formData.preferredDonationType,
-          };
-          await setDoc(doc(db, "donors", user.uid), userData);
-          break;
-
-        case "company":
-          userData = {
-            ...userData,
-            companyName: formData.companyName,
-            companyRegNumber: formData.companyRegNumber,
-            companyWebsite: formData.companyWebsite,
-            preferredDonationType: formData.preferredDonationType,
-          };
-          await setDoc(doc(db, "donors", user.uid), userData);
-          break;
-
-        case "ngo":
-          userData = {
-            ...userData,
-            registrationNumber: formData.registrationNumber,
-            contactPerson: formData.contactPerson,
-            website: formData.website,
-            beneficiaries: formData.beneficiaries,
-            areasOfFocus: formData.areasOfFocus,
-          };
-          await setDoc(doc(db, "ngos", user.uid), userData);
-          break;
-
-        case "farmer":
-          userData = {
-            ...userData,
-            farmName: formData.farmName,
-            farmSize: formData.farmSize,
-            cropType: formData.cropType,
-            maxFoodQuantity: formData.maxFoodQuantity,
-          };
-          await setDoc(doc(db, "farmers", user.uid), userData);
-          break;
-
-        case "volunteer":
-          userData = {
-            ...userData,
-            vehicleType: formData.vehicleType,
-            availability: formData.availability,
-            maxDistance: formData.maxDistance,
-            completedDeliveries: 0,
-          };
-          await setDoc(doc(db, "volunteers", user.uid), userData);
-          break;
-
-        default:
-          throw new Error("Invalid account type");
+      // Add role-specific fields
+      if (accountType === "individual") {
+        userData.idNumber = formData.idNumber;
+      } else if (accountType === "company") {
+        userData.companyName = formData.companyName;
+        userData.companyRegNumber = formData.companyRegNumber;
+        userData.companyWebsite = formData.companyWebsite;
+      } else if (accountType === "ngo") {
+        userData.registrationNumber = formData.registrationNumber;
+        userData.contactPerson = formData.contactPerson;
+        userData.website = formData.website;
+        userData.beneficiaries = formData.beneficiaries;
+        userData.areasOfFocus = formData.areasOfFocus;
+      } else if (accountType === "farmer") {
+        userData.farmName = formData.farmName;
+        userData.farmSize = formData.farmSize;
+        userData.cropType = formData.cropType;
+        userData.maxFoodQuantity = formData.maxFoodQuantity;
+      } else if (accountType === "volunteer") {
+        userData.vehicleType = formData.vehicleType;
+        userData.availability = formData.availability;
+        userData.maxDistance = formData.maxDistance;
+        userData.completedDeliveries = 0;
       }
 
-      setSuccess("Registered successfully! Awaiting admin verification.");
+      await setDoc(doc(db, "users", formData.email), userData);
 
-      // Reset form
+      setSuccess("Registered successfully! Awaiting admin verification.");
       setFormData({
         name: "",
         email: "",
@@ -217,7 +174,6 @@ const UnifiedSignup = ({ onAlreadyHaveAccountClick }) => {
         city: "",
         country: "",
         idNumber: "",
-        preferredDonationType: "",
         companyName: "",
         companyRegNumber: "",
         companyWebsite: "",
@@ -240,7 +196,6 @@ const UnifiedSignup = ({ onAlreadyHaveAccountClick }) => {
       setLoading(false);
     }
   };
-
   return (
     <section className="signup-container">
       <h2 className="signup-title">Create Account</h2>
@@ -254,16 +209,16 @@ const UnifiedSignup = ({ onAlreadyHaveAccountClick }) => {
           onChange={(e) => setAccountType(e.target.value)}
           className="account-type-select"
         >
-          <option value="individual">Individual Donor</option>
-          <option value="company">Company/Organization Donor</option>
-          <option value="ngo">NGO (Receiver)</option>
-          <option value="farmer">Farmer (Receiver)</option>
+          <option value="individual">Individual</option>
+          <option value="company">Company/Organization</option>
+          <option value="ngo">NGO</option>
+          <option value="farmer">Farmer</option>
           <option value="volunteer">Volunteer</option>
         </select>
       </div>
 
       <form onSubmit={handleSubmit} className="signup-form">
-        {/* Common fields for all account types */}
+        {/* Basic fields */}
         <div className="form-section">
           <h3>Basic Information</h3>
           <div className="form-row">
@@ -358,27 +313,7 @@ const UnifiedSignup = ({ onAlreadyHaveAccountClick }) => {
           </div>
         </div>
 
-        {/* Individual Donor specific fields */}
-        {(accountType === "individual" || accountType === "company") && (
-          <div className="form-section">
-            <h3>Donation Preferences</h3>
-            <select
-              name="preferredDonationType"
-              value={formData.preferredDonationType}
-              onChange={handleChange}
-              required
-              className="signup-select full-width"
-            >
-              <option value="">What would you like to donate?</option>
-              <option value="monetary">Monetary Donations</option>
-              <option value="food">Food Items</option>
-              <option value="clothes">Clothing</option>
-              <option value="services">Services/Volunteering</option>
-              <option value="other">Other Resources</option>
-            </select>
-          </div>
-        )}
-
+        {/* Individual Donor fields */}
         {accountType === "individual" && (
           <div className="form-section">
             <h3>Individual Information</h3>
@@ -394,7 +329,7 @@ const UnifiedSignup = ({ onAlreadyHaveAccountClick }) => {
           </div>
         )}
 
-        {/* Company Donor specific fields */}
+        {/* Company Donor fields */}
         {accountType === "company" && (
           <div className="form-section">
             <h3>Company Information</h3>
@@ -429,7 +364,7 @@ const UnifiedSignup = ({ onAlreadyHaveAccountClick }) => {
           </div>
         )}
 
-        {/* NGO specific fields */}
+        {/* NGO fields */}
         {accountType === "ngo" && (
           <div className="form-section">
             <h3>NGO Information</h3>
@@ -480,7 +415,7 @@ const UnifiedSignup = ({ onAlreadyHaveAccountClick }) => {
           </div>
         )}
 
-        {/* Farmer specific fields */}
+        {/* Farmer fields */}
         {accountType === "farmer" && (
           <div className="form-section">
             <h3>Farm Information</h3>
@@ -523,7 +458,7 @@ const UnifiedSignup = ({ onAlreadyHaveAccountClick }) => {
           </div>
         )}
 
-        {/* Volunteer specific fields */}
+        {/* Volunteer fields */}
         {accountType === "volunteer" && (
           <div className="form-section">
             <h3>Volunteer Information</h3>

@@ -1,12 +1,13 @@
 .login-container {
-  max-width: 380px;
-  margin: 80px auto;
+  max-width: 400px; /* Increased width */
+  margin: 60px auto;
   padding: 30px 25px;
-  background: rgba(255, 255, 255, 0.98);
+  background: #ffffff;
   border-radius: 18px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
   text-align: center;
 }
+
 
 .login-title {
   font-size: 30px;

@@ -6,10 +6,10 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 
 import "./App.css";
 import LandingPage from "./pages/LandingPage";
-import LandingChoice from "./pages/LandingChoice";
+
 import DonorDashboard from "./pages/DonorDashboard";
-import RAuth from "./pages/RAuth";
-import DonorAuth from "./pages/DonorAuth";
+
+
 import AuthContainer from "./pages/AuthContainer";
 import NGODashboard from "./pages/NGODashboard";
 
@@ -28,11 +28,8 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="/LandingChoice" element={<LandingChoice />} />
         <Route path="/donor-dashboard" element={<DonorDashboard />} />
         <Route path="/AuthContainer" element={<AuthContainer />} />
-        <Route path="/RAuth" element={<RAuth />} />
-        <Route path="/DonorAuth" element={<DonorAuth />} />
         <Route path="/NGODashboard" element={<NGODashboard />} />
         <Route path="/FoodReceiver" element={<FoodReceiver />} />
 

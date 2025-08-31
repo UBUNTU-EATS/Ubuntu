@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import DonorProfile from "./DomorProfile";
+import DonorProfile from "./DonorProfile";
 import DonationForm from "./DonorForm";
 import ActiveDonations from "./ActiveDonations";
 import "../styles/DonorDashboard.css";
