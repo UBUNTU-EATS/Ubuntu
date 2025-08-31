@@ -1,0 +1,176 @@
+.signup-container {
+  min-height: 100vh;
+  background-color: #f9f9f9;
+}
+
+.signup-form-container {
+  display: flex;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+  gap: 3rem;
+}
+
+.signup-form {
+  flex: 1;
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+.signup-form h2 {
+  color: #2e7d32;
+  text-align: center;
+  margin-bottom: 0.5rem;
+}
+
+.signup-form > p {
+  text-align: center;
+  color: #666;
+  margin-bottom: 2rem;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: #333;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 0.8rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-family: "Segoe UI", sans-serif;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: #2e7d32;
+  box-shadow: 0 0 0 2px rgba(46, 125, 50, 0.2);
+}
+
+.form-row {
+  display: flex;
+  gap: 1rem;
+}
+
+.form-row .form-group {
+  flex: 1;
+}
+
+.signup-btn {
+  width: 100%;
+  padding: 1rem;
+  background: #2e7d32;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 1.1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.3s;
+  margin-top: 1rem;
+}
+
+.signup-btn:hover:not(:disabled) {
+  background: #1b5e20;
+}
+
+.signup-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.login-link {
+  text-align: center;
+  margin-top: 1.5rem;
+}
+
+.login-link a {
+  color: #2e7d32;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.login-link a:hover {
+  text-decoration: underline;
+}
+
+.error-message {
+  background: #ffebee;
+  color: #c62828;
+  padding: 0.8rem;
+  border-radius: 6px;
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.signup-benefits {
+  flex: 1;
+  padding: 2rem;
+}
+
+.signup-benefits h3 {
+  color: #2e7d32;
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.benefit-item {
+  background: #e8f5e9;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.benefit-item h4 {
+  color: #2e7d32;
+  margin: 0 0 0.5rem 0;
+}
+
+.benefit-item p {
+  margin: 0;
+  color: #666;
+}
+
+@media (max-width: 768px) {
+  .signup-form-container {
+    flex-direction: column;
+    padding: 1rem;
+  }
+
+  .form-row {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .signup-form {
+    padding: 1.5rem;
+  }
+}
+.demo-warning {
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeaa7;
+}
+
+.demo-notice {
+  background: #fff3cd;
+  border-left: 4px solid #ffc107;
+}
+
+.demo-notice h4 {
+  color: #856404;
+}

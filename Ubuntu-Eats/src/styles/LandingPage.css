@@ -14,33 +14,32 @@ body {
 .landingPage {
   width: 100%;
   height: 100vh;
-  overflow-x: hidden;   /* ✅ kills horizontal scroll */
+  overflow-x: hidden; /* ✅ kills horizontal scroll */
   overflow-y: auto;
   box-sizing: border-box;
 }
 .navbar {
   display: flex;
   justify-content: space-between;
-  align-items: center;   /* keep items vertically centered */
+  align-items: center; /* keep items vertically centered */
   padding: 0 0.5rem;
   background: #2e7d32;
   color: #fff;
-  height: 45px;          /* compact but tall enough for text */
+  height: 45px; /* compact but tall enough for text */
 }
 
 .logo {
   font-size: 1rem;
   font-weight: bold;
   margin: 0 0.5rem;
-  line-height: 6;        
+  line-height: 6;
 }
 
 .nav-links a {
   margin: 0 0.5rem;
-  font-size: 0.8rem; 
+  font-size: 0.8rem;
   color: #fff;
 }
-
 
 .hero {
   padding: 4rem 2rem;

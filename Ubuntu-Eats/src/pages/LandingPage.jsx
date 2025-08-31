@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import "../styles/LandingPage.css";
 
 const LandingPage = () => {
@@ -16,9 +17,9 @@ const LandingPage = () => {
       <header className="hero">
         <h2>Turning Food Waste into Food Aid</h2>
         <p>
-          UBUNTU-EATS connects restaurants, supermarkets, and households with NGOs
-          and volunteers to redistribute surplus food in real time. Together, we
-          can fight hunger and reduce waste.
+          UBUNTU-EATS connects restaurants, supermarkets, and households with
+          NGOs and volunteers to redistribute surplus food in real time.
+          Together, we can fight hunger and reduce waste.
         </p>
         <button className="cta-btn">Join the Movement</button>
       </header>
@@ -28,15 +29,24 @@ const LandingPage = () => {
         <div className="feature-list">
           <div className="feature-card">
             <h4>1. Post Surplus Food</h4>
-            <p>Restaurants and shops upload food they can’t sell but is still good.</p>
+            <p>
+              Restaurants and shops upload food they can’t sell but is still
+              good.
+            </p>
           </div>
           <div className="feature-card">
             <h4>2. Find & Claim</h4>
-            <p>NGOs and volunteers see available food nearby and claim it instantly.</p>
+            <p>
+              NGOs and volunteers see available food nearby and claim it
+              instantly.
+            </p>
           </div>
           <div className="feature-card">
             <h4>3. Deliver Help</h4>
-            <p>Food gets picked up by the NGOs or Volunteers and gets distributed to those in need.</p>
+            <p>
+              Food gets picked up by the NGOs or Volunteers and gets distributed
+              to those in need.
+            </p>
           </div>
         </div>
       </section>
@@ -44,7 +54,18 @@ const LandingPage = () => {
       <section id="join" className="join">
         <h3>Be Part of the Change</h3>
         <p>Sign up today and help us provide meals, one pickup at a time.</p>
-        <button className="cta-btn">Get Started</button>
+        <div className="cta-buttons">
+          <Link to="/ReceiverDashboard" className="cta-btn">
+            Become a Donor
+          </Link>
+          <Link to="/receiver-login" className="cta-btn secondary">
+            Find Donations
+          </Link>
+
+          <Link to="/volunteer-dashboard" className="cta-btn">
+            Become a Volunteer
+          </Link>
+        </div>
       </section>
 
       <footer className="footer">
