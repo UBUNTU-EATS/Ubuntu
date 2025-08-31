@@ -1,11 +1,11 @@
 import React, { useState } from "react";
-
 import {
   signInWithEmailAndPassword,
   GoogleAuthProvider,
   signInWithPopup,
 } from "firebase/auth";
-import { auth } from "../../firebaseConfig";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "../../firebaseConfig";
 import { useNavigate } from "react-router-dom";
 import "../styles/login.css";
 
@@ -19,14 +19,70 @@ const Login = ({ onCreateAccountClick }) => {
     event.preventDefault();
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      navigate("/donor-dashboard");
-    } catch (err) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("An unknown error occurred");
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+      const user = userCredential.user;
+
+      // Check account type in Firestore
+      let accountType = null;
+
+      // Check in donors collection
+      const donorDoc = await getDoc(doc(db, "donors", user.uid));
+      if (donorDoc.exists()) {
+        accountType = donorDoc.data().accountType;
       }
+
+      // If not found in donors, check in ngos collection
+      if (!accountType) {
+        const ngoDoc = await getDoc(doc(db, "ngos", user.uid));
+        if (ngoDoc.exists()) {
+          accountType = "ngo";
+        }
+      }
+
+      // If not found in ngos, check in farmers collection
+      if (!accountType) {
+        const farmerDoc = await getDoc(doc(db, "farmers", user.uid));
+        if (farmerDoc.exists()) {
+          accountType = "farmer";
+        }
+      }
+
+      // If not found in farmers, check in volunteers collection
+      if (!accountType) {
+        const volunteerDoc = await getDoc(doc(db, "volunteers", user.uid));
+        if (volunteerDoc.exists()) {
+          accountType = "volunteer";
+        }
+      }
+
+      // Redirect based on account type
+      if (accountType) {
+        switch (accountType) {
+          case "individual":
+          case "company":
+            navigate("/donor-dashboard");
+            break;
+          case "ngo":
+            navigate("/NGODashboard");
+            break;
+          case "farmer":
+            navigate("/NGODashboard");
+            break;
+          case "volunteer":
+            navigate("/VolunteerDashboard");
+            break;
+          default:
+            navigate("/LandingPage");
+        }
+      } else {
+        setError("Account type not found. Please contact support.");
+      }
+    } catch (err) {
+      setError(err.message);
     }
   };
 
@@ -36,13 +92,8 @@ const Login = ({ onCreateAccountClick }) => {
     try {
       const result = await signInWithPopup(auth, provider);
       navigate("/home");
-      const user = result.user;
     } catch (err) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("An unknown error occurred during Google sign-in");
-      }
+      setError(err.message);
     }
   };
 
@@ -51,7 +102,6 @@ const Login = ({ onCreateAccountClick }) => {
       <h2 className="login-title">Login</h2>
       <form onSubmit={handleLogin} className="login-form">
         <input
-          test-id="email-input"
           type="email"
           placeholder="Email"
           value={email}
@@ -60,7 +110,6 @@ const Login = ({ onCreateAccountClick }) => {
           className="login-email"
         />
         <input
-          test-id="password-input"
           type="password"
           placeholder="Password"
           value={password}

@@ -51,7 +51,7 @@ const LandingChoice = () => {
           <div className="feature-card">
             <h4>NGO / Farmer</h4>
             <p>Organizations and farmers who distribute food aid.</p>
-            <button className="cta-btn" onClick={() => navigate("/signup-ngo")}>
+            <button className="cta-btn" onClick={() => navigate("./RAuth")}>
               Sign up as NGO / Farmer
             </button>
           </div>

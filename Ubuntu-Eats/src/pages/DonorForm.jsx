@@ -14,7 +14,7 @@ const DonationForm = ({ onSubmit, donorData }) => {
     specialInstructions: "",
     contactPerson: donorData.name,
     contactPhone: donorData.phone,
-    pickupAddress: donorData.address
+    pickupAddress: donorData.address,
   });
 
   const [images, setImages] = useState([]);
@@ -22,9 +22,9 @@ const DonationForm = ({ onSubmit, donorData }) => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
   };
 
@@ -34,15 +34,18 @@ const DonationForm = ({ onSubmit, donorData }) => {
   };
 
   const processFiles = (files) => {
-    files.forEach(file => {
-      if (file.type.startsWith('image/')) {
+    files.forEach((file) => {
+      if (file.type.startsWith("image/")) {
         const reader = new FileReader();
         reader.onload = (e) => {
-          setImages(prev => [...prev, {
-            id: Date.now() + Math.random(),
-            url: e.target.result,
-            name: file.name
-          }]);
+          setImages((prev) => [
+            ...prev,
+            {
+              id: Date.now() + Math.random(),
+              url: e.target.result,
+              name: file.name,
+            },
+          ]);
         };
         reader.readAsDataURL(file);
       }
@@ -63,13 +66,13 @@ const DonationForm = ({ onSubmit, donorData }) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    
+
     const files = Array.from(e.dataTransfer.files);
     processFiles(files);
   };
 
   const removeImage = (id) => {
-    setImages(prev => prev.filter(img => img.id !== id));
+    setImages((prev) => prev.filter((img) => img.id !== id));
   };
 
   const handleSubmit = (e) => {
@@ -79,10 +82,10 @@ const DonationForm = ({ onSubmit, donorData }) => {
       images: images,
       submittedAt: new Date().toISOString(),
       scheduledTime: `${formData.pickupDate} ${formData.pickupTime}`,
-      location: formData.pickupAddress
+      location: formData.pickupAddress,
     };
     onSubmit(donation);
-    
+
     // Reset form
     setFormData({
       foodType: "",
@@ -96,13 +99,13 @@ const DonationForm = ({ onSubmit, donorData }) => {
       specialInstructions: "",
       contactPerson: donorData.name,
       contactPhone: donorData.phone,
-      pickupAddress: donorData.address
+      pickupAddress: donorData.address,
     });
     setImages([]);
   };
 
   // Get today's date for min date validation
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toISOString().split("T")[0];
 
   return (
     <div className="donation-form-container">
@@ -208,8 +211,8 @@ const DonationForm = ({ onSubmit, donorData }) => {
         {/* Food Images */}
         <div className="form-section">
           <h3>Food Images</h3>
-          <div 
-            className={`image-upload-area ${dragActive ? 'drag-active' : ''}`}
+          <div
+            className={`image-upload-area ${dragActive ? "drag-active" : ""}`}
             onDragEnter={handleDrag}
             onDragLeave={handleDrag}
             onDragOver={handleDrag}
@@ -221,7 +224,7 @@ const DonationForm = ({ onSubmit, donorData }) => {
               multiple
               accept="image/*"
               onChange={handleImageUpload}
-              style={{ display: 'none' }}
+              style={{ display: "none" }}
             />
             <label htmlFor="images" className="upload-label">
               <div className="upload-icon">📷</div>
@@ -232,11 +235,11 @@ const DonationForm = ({ onSubmit, donorData }) => {
 
           {images.length > 0 && (
             <div className="image-preview-grid">
-              {images.map(image => (
+              {images.map((image) => (
                 <div key={image.id} className="image-preview">
                   <img src={image.url} alt={image.name} />
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     className="remove-image"
                     onClick={() => removeImage(image.id)}
                   >

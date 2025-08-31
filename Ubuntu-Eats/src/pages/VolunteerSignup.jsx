@@ -1,8 +1,11 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { auth, db } from "../firebase";
+
+// ✅ Firebase imports
+import { auth, db } from "../../firebaseConfig";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+
 import "../styles/Auth.css";
 
 const VolunteerSignup = () => {
@@ -18,6 +21,7 @@ const VolunteerSignup = () => {
     maxDistance: "",
     address: "",
   });
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
     setFormData({
@@ -33,6 +37,7 @@ const VolunteerSignup = () => {
       return;
     }
 
+    setLoading(true);
     try {
       // 1) Create Auth account
       const userCredential = await createUserWithEmailAndPassword(
@@ -53,14 +58,17 @@ const VolunteerSignup = () => {
         address: formData.address,
         status: "pending", // for admin verification
         completedDeliveries: 0,
+        role: "volunteer", // 👈 for login redirection later
         createdAt: serverTimestamp(),
       });
 
       alert("Volunteer registered successfully! Pending admin verification.");
       navigate("/volunteer-login");
     } catch (err) {
-      console.error(err);
+      console.error("Signup error:", err);
       alert(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -172,8 +180,8 @@ const VolunteerSignup = () => {
             required
           />
 
-          <button type="submit" className="cta-btn">
-            Register Volunteer
+          <button type="submit" className="cta-btn" disabled={loading}>
+            {loading ? "Registering..." : "Register Volunteer"}
           </button>
         </form>
         <p>

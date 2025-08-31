@@ -1,3 +1,4 @@
+// DSignUp.jsx
 import React, { useState } from "react";
 import "../styles/signup.css";
 import { auth, db } from "../../firebaseConfig";
@@ -5,7 +6,7 @@ import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 
 const DSignUp = ({ onAlreadyHaveAccountClick }) => {
-  const [donorType, setDonorType] = useState("individual"); // default to individual
+  const [donorType, setDonorType] = useState("individual");
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -34,6 +35,43 @@ const DSignUp = ({ onAlreadyHaveAccountClick }) => {
 
   const handleDonorTypeChange = (e) => {
     setDonorType(e.target.value);
+    // Reset type-specific fields when changing donor type
+    setFormData((prev) => ({
+      ...prev,
+      idNumber: "",
+      companyName: "",
+      companyRegNumber: "",
+      companyWebsite: "",
+    }));
+  };
+
+  const validateForm = () => {
+    if (formData.password !== formData.confirmPassword) {
+      setError("Passwords do not match.");
+      return false;
+    }
+
+    if (formData.password.length < 6) {
+      setError("Password should be at least 6 characters.");
+      return false;
+    }
+
+    if (donorType === "individual" && !formData.idNumber) {
+      setError("ID/Passport number is required for individuals.");
+      return false;
+    }
+
+    if (
+      donorType === "company" &&
+      (!formData.companyName || !formData.companyRegNumber)
+    ) {
+      setError(
+        "Company name and registration number are required for companies."
+      );
+      return false;
+    }
+
+    return true;
   };
 
   const handleSubmit = async (e) => {
@@ -41,10 +79,7 @@ const DSignUp = ({ onAlreadyHaveAccountClick }) => {
     setError("");
     setSuccess("");
 
-    if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match.");
-      return;
-    }
+    if (!validateForm()) return;
 
     try {
       // Create user in Firebase Auth
@@ -106,108 +141,143 @@ const DSignUp = ({ onAlreadyHaveAccountClick }) => {
       {success && <p className="signup-success">{success}</p>}
 
       <div className="donor-type-selector">
-        <label>Donor Type</label>
-        <select value={donorType} onChange={handleDonorTypeChange} className="donor-type-select">
-          <option value="individual">Individual</option>
-          <option value="company">Company</option>
-        </select>
+        <label>I am signing up as:</label>
+        <div className="donor-type-options">
+          <label className="donor-type-option">
+            <input
+              type="radio"
+              value="individual"
+              checked={donorType === "individual"}
+              onChange={handleDonorTypeChange}
+            />
+            <span>Individual</span>
+          </label>
+          <label className="donor-type-option">
+            <input
+              type="radio"
+              value="company"
+              checked={donorType === "company"}
+              onChange={handleDonorTypeChange}
+            />
+            <span>Company/Organization</span>
+          </label>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="signup-form">
-        <input
-          type="text"
-          name="fullName"
-          placeholder="Full Name"
-          value={formData.fullName}
-          onChange={handleChange}
-          required
-          className="signup-input"
-        />
-        <input
-          type="email"
-          name="email"
-          placeholder="Email Address"
-          value={formData.email}
-          onChange={handleChange}
-          required
-          className="signup-email"
-        />
-        <input
-          type="password"
-          name="password"
-          placeholder="Password"
-          value={formData.password}
-          onChange={handleChange}
-          required
-          className="signup-password"
-        />
-        <input
-          type="password"
-          name="confirmPassword"
-          placeholder="Confirm Password"
-          value={formData.confirmPassword}
-          onChange={handleChange}
-          required
-          className="signup-confirm-password"
-        />
-        <input
-          type="text"
-          name="phone"
-          placeholder="Phone Number"
-          value={formData.phone}
-          onChange={handleChange}
-          required
-          className="signup-input"
-        />
-        <input
-          type="text"
-          name="address"
-          placeholder="Address"
-          value={formData.address}
-          onChange={handleChange}
-          required
-          className="signup-input"
-        />
-        <input
-          type="text"
-          name="country"
-          placeholder="Country"
-          value={formData.country}
-          onChange={handleChange}
-          required
-          className="signup-input"
-        />
-        <select
-          name="preferredDonationType"
-          value={formData.preferredDonationType}
-          onChange={handleChange}
-          required
-          className="signup-select"
-        >
-          <option value="">Preferred Donation Type</option>
-          <option value="monetary">Monetary</option>
-          <option value="food">Food</option>
-          <option value="clothes">Clothes</option>
-          <option value="services">Services</option>
-          <option value="other">Other</option>
-        </select>
+        <div className="form-section">
+          <h3>Account Information</h3>
+          <div className="form-row">
+            <input
+              type="text"
+              name="fullName"
+              placeholder={
+                donorType === "individual" ? "Full Name" : "Contact Person Name"
+              }
+              value={formData.fullName}
+              onChange={handleChange}
+              required
+              className="signup-input"
+            />
+            <input
+              type="email"
+              name="email"
+              placeholder="Email Address"
+              value={formData.email}
+              onChange={handleChange}
+              required
+              className="signup-input"
+            />
+          </div>
+          <div className="form-row">
+            <input
+              type="password"
+              name="password"
+              placeholder="Password"
+              value={formData.password}
+              onChange={handleChange}
+              required
+              className="signup-input"
+            />
+            <input
+              type="password"
+              name="confirmPassword"
+              placeholder="Confirm Password"
+              value={formData.confirmPassword}
+              onChange={handleChange}
+              required
+              className="signup-input"
+            />
+          </div>
+        </div>
 
-        {/* Individual Fields */}
-        {donorType === "individual" && (
+        <div className="form-section">
+          <h3>Contact Information</h3>
+          <div className="form-row">
+            <input
+              type="text"
+              name="phone"
+              placeholder="Phone Number"
+              value={formData.phone}
+              onChange={handleChange}
+              required
+              className="signup-input"
+            />
+            <input
+              type="text"
+              name="country"
+              placeholder="Country"
+              value={formData.country}
+              onChange={handleChange}
+              required
+              className="signup-input"
+            />
+          </div>
           <input
             type="text"
-            name="idNumber"
-            placeholder="ID / Passport Number"
-            value={formData.idNumber}
+            name="address"
+            placeholder="Full Address"
+            value={formData.address}
             onChange={handleChange}
             required
-            className="signup-input"
+            className="signup-input full-width"
           />
-        )}
+        </div>
 
-        {/* Company Fields */}
-        {donorType === "company" && (
-          <>
+        <div className="form-section">
+          <h3>Donation Preferences</h3>
+          <select
+            name="preferredDonationType"
+            value={formData.preferredDonationType}
+            onChange={handleChange}
+            required
+            className="signup-select full-width"
+          >
+            <option value="">What would you like to donate?</option>
+            <option value="monetary">Monetary Donations</option>
+            <option value="food">Food Items</option>
+            <option value="clothes">Clothing</option>
+            <option value="services">Services/Volunteering</option>
+            <option value="other">Other Resources</option>
+          </select>
+        </div>
+
+        {donorType === "individual" ? (
+          <div className="form-section">
+            <h3>Individual Information</h3>
+            <input
+              type="text"
+              name="idNumber"
+              placeholder="ID / Passport Number"
+              value={formData.idNumber}
+              onChange={handleChange}
+              required
+              className="signup-input full-width"
+            />
+          </div>
+        ) : (
+          <div className="form-section">
+            <h3>Company Information</h3>
             <input
               type="text"
               name="companyName"
@@ -215,33 +285,35 @@ const DSignUp = ({ onAlreadyHaveAccountClick }) => {
               value={formData.companyName}
               onChange={handleChange}
               required
-              className="signup-input"
+              className="signup-input full-width"
             />
-            <input
-              type="text"
-              name="companyRegNumber"
-              placeholder="Company Registration Number"
-              value={formData.companyRegNumber}
-              onChange={handleChange}
-              required
-              className="signup-input"
-            />
-            <input
-              type="text"
-              name="companyWebsite"
-              placeholder="Company Website"
-              value={formData.companyWebsite}
-              onChange={handleChange}
-              className="signup-input"
-            />
-          </>
+            <div className="form-row">
+              <input
+                type="text"
+                name="companyRegNumber"
+                placeholder="Company Registration Number"
+                value={formData.companyRegNumber}
+                onChange={handleChange}
+                required
+                className="signup-input"
+              />
+              <input
+                type="text"
+                name="companyWebsite"
+                placeholder="Company Website (optional)"
+                value={formData.companyWebsite}
+                onChange={handleChange}
+                className="signup-input"
+              />
+            </div>
+          </div>
         )}
 
         <button type="submit" className="signup-button">
-          Sign Up
+          Create Account
         </button>
       </form>
-      
+
       <section className="have-account">
         <p>
           Already have an account?{" "}

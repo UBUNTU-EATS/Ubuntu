@@ -1,9 +1,9 @@
-import RSignUp from "./RSignup";
-import Login from "./login";
-import { useState } from "react";
+import React, { useState } from "react";
+import Login from "./Login";
+import UnifiedSignup from "./UnifiedSignup";
 import "../styles/Auth.css";
 
-const RAuth = () => {
+const AuthContainer = () => {
   const [showLogin, setShowLogin] = useState(true);
   const [showSignup, setShowSignup] = useState(false);
 
@@ -18,16 +18,10 @@ const RAuth = () => {
   };
 
   return (
-    <main className="authentication-page">
-      {showLogin && (
-        <Login
-          isActive={showLogin}
-          onCreateAccountClick={handleCreateAccountClick}
-        />
-      )}
+    <main className="auth-container">
+      {showLogin && <Login onCreateAccountClick={handleCreateAccountClick} />}
       {showSignup && (
-        <RSignUp
-          isActive={showSignup}
+        <UnifiedSignup
           onAlreadyHaveAccountClick={handleAlreadyHaveAccountClick}
         />
       )}
@@ -35,4 +29,4 @@ const RAuth = () => {
   );
 };
 
-export default RAuth;
+export default AuthContainer;

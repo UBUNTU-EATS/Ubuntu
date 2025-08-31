@@ -5,7 +5,7 @@ import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 
 const RSignUp = ({ onAlreadyHaveAccountClick }) => {
-  const [receiverType, setReceiverType] = useState("individual"); 
+  const [receiverType, setReceiverType] = useState("ngo"); // default NGO
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -15,11 +15,19 @@ const RSignUp = ({ onAlreadyHaveAccountClick }) => {
     address: "",
     city: "",
     country: "",
-    organization: "",
+
+    // NGO fields
+    registrationNumber: "",
     contactPerson: "",
     website: "",
-    maxFoodQuantity: "",
+    beneficiaries: "",
     areasOfFocus: "",
+
+    // Farmer fields
+    farmName: "",
+    farmSize: "",
+    cropType: "",
+    maxFoodQuantity: "",
   });
 
   const [error, setError] = useState("");
@@ -27,14 +35,7 @@ const RSignUp = ({ onAlreadyHaveAccountClick }) => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  const handleReceiverTypeChange = (e) => {
-    setReceiverType(e.target.value);
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
@@ -48,7 +49,6 @@ const RSignUp = ({ onAlreadyHaveAccountClick }) => {
     }
 
     try {
-      // Create user in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         formData.email,
@@ -56,8 +56,8 @@ const RSignUp = ({ onAlreadyHaveAccountClick }) => {
       );
       const user = userCredential.user;
 
-      // Build receiver data
-      const receiverData = {
+      // Shared fields
+      let receiverData = {
         receiverType,
         name: formData.name,
         email: formData.email,
@@ -65,25 +65,41 @@ const RSignUp = ({ onAlreadyHaveAccountClick }) => {
         address: formData.address,
         city: formData.city,
         country: formData.country,
-        contactPerson: formData.contactPerson,
-        maxFoodQuantity: formData.maxFoodQuantity,
-        areasOfFocus: formData.areasOfFocus,
         createdAt: new Date(),
-        status: "pending", // awaiting admin verification
+        status: "pending",
       };
 
-      // Add optional fields
-      if (formData.organization) {
-        receiverData.organization = formData.organization;
-      }
-      if (formData.website) {
-        receiverData.website = formData.website;
+      // Add extra fields
+      if (receiverType === "ngo") {
+        receiverData = {
+          ...receiverData,
+          registrationNumber: formData.registrationNumber,
+          contactPerson: formData.contactPerson,
+          website: formData.website,
+          beneficiaries: formData.beneficiaries,
+          areasOfFocus: formData.areasOfFocus,
+        };
+
+        // Save NGO in "ngos" collection
+        await setDoc(doc(db, "ngos", user.uid), receiverData);
       }
 
-      // Save receiver data in Firestore
-      await setDoc(doc(db, "receivers", user.uid), receiverData);
+      if (receiverType === "farmer") {
+        receiverData = {
+          ...receiverData,
+          farmName: formData.farmName,
+          farmSize: formData.farmSize,
+          cropType: formData.cropType,
+          maxFoodQuantity: formData.maxFoodQuantity,
+        };
 
-      setSuccess("Receiver registered successfully! Awaiting admin verification.");
+        // Save Farmer in "farmers" collection
+        await setDoc(doc(db, "farmers", user.uid), receiverData);
+      }
+
+      setSuccess("Registered successfully! Awaiting admin verification.");
+
+      // Reset form
       setFormData({
         name: "",
         email: "",
@@ -93,11 +109,15 @@ const RSignUp = ({ onAlreadyHaveAccountClick }) => {
         address: "",
         city: "",
         country: "",
-        organization: "",
+        registrationNumber: "",
         contactPerson: "",
         website: "",
-        maxFoodQuantity: "",
+        beneficiaries: "",
         areasOfFocus: "",
+        farmName: "",
+        farmSize: "",
+        cropType: "",
+        maxFoodQuantity: "",
       });
     } catch (err) {
       setError(err.message);
@@ -110,16 +130,20 @@ const RSignUp = ({ onAlreadyHaveAccountClick }) => {
       {error && <p className="signup-error">{error}</p>}
       {success && <p className="signup-success">{success}</p>}
 
-      <div className="receiver-type-selector">
+      <div className="donor-type-selector">
         <label>Receiver Type</label>
-        <select value={receiverType} onChange={handleReceiverTypeChange} className="receiver-type-select">
-          <option value="individual">Individual</option>
+        <select
+          value={receiverType}
+          onChange={(e) => setReceiverType(e.target.value)}
+          className="receiver-type-select"
+        >
           <option value="ngo">NGO</option>
           <option value="farmer">Farmer</option>
         </select>
       </div>
 
       <form onSubmit={handleSubmit} className="signup-form">
+        {/* shared fields */}
         <input
           type="text"
           name="name"
@@ -127,7 +151,6 @@ const RSignUp = ({ onAlreadyHaveAccountClick }) => {
           value={formData.name}
           onChange={handleChange}
           required
-          className="signup-input"
         />
         <input
           type="email"
@@ -136,7 +159,6 @@ const RSignUp = ({ onAlreadyHaveAccountClick }) => {
           value={formData.email}
           onChange={handleChange}
           required
-          className="signup-email"
         />
         <input
           type="password"
@@ -145,7 +167,6 @@ const RSignUp = ({ onAlreadyHaveAccountClick }) => {
           value={formData.password}
           onChange={handleChange}
           required
-          className="signup-password"
         />
         <input
           type="password"
@@ -154,16 +175,6 @@ const RSignUp = ({ onAlreadyHaveAccountClick }) => {
           value={formData.confirmPassword}
           onChange={handleChange}
           required
-          className="signup-confirm-password"
-        />
-        <input
-          type="text"
-          name="contactPerson"
-          placeholder="Contact Person"
-          value={formData.contactPerson}
-          onChange={handleChange}
-          required
-          className="signup-input"
         />
         <input
           type="text"
@@ -172,7 +183,6 @@ const RSignUp = ({ onAlreadyHaveAccountClick }) => {
           value={formData.phone}
           onChange={handleChange}
           required
-          className="signup-input"
         />
         <input
           type="text"
@@ -181,7 +191,6 @@ const RSignUp = ({ onAlreadyHaveAccountClick }) => {
           value={formData.address}
           onChange={handleChange}
           required
-          className="signup-input"
         />
         <input
           type="text"
@@ -190,7 +199,6 @@ const RSignUp = ({ onAlreadyHaveAccountClick }) => {
           value={formData.city}
           onChange={handleChange}
           required
-          className="signup-input"
         />
         <input
           type="text"
@@ -199,48 +207,96 @@ const RSignUp = ({ onAlreadyHaveAccountClick }) => {
           value={formData.country}
           onChange={handleChange}
           required
-          className="signup-input"
         />
-        <input
-          type="text"
-          name="organization"
-          placeholder="Organization (Optional)"
-          value={formData.organization}
-          onChange={handleChange}
-          className="signup-input"
-        />
-        <input
-          type="url"
-          name="website"
-          placeholder="Website (Optional)"
-          value={formData.website}
-          onChange={handleChange}
-          className="signup-input"
-        />
-        <input
-          type="number"
-          name="maxFoodQuantity"
-          placeholder="Maximum Food Quantity (kg)"
-          value={formData.maxFoodQuantity}
-          onChange={handleChange}
-          required
-          className="signup-input"
-        />
-        <input
-          type="text"
-          name="areasOfFocus"
-          placeholder="Areas of Focus"
-          value={formData.areasOfFocus}
-          onChange={handleChange}
-          required
-          className="signup-input"
-        />
+
+        {/* NGO-specific fields */}
+        {receiverType === "ngo" && (
+          <>
+            <input
+              type="text"
+              name="registrationNumber"
+              placeholder="Registration Number"
+              value={formData.registrationNumber}
+              onChange={handleChange}
+              required
+            />
+            <input
+              type="text"
+              name="contactPerson"
+              placeholder="Contact Person"
+              value={formData.contactPerson}
+              onChange={handleChange}
+              required
+            />
+            <input
+              type="url"
+              name="website"
+              placeholder="Website"
+              value={formData.website}
+              onChange={handleChange}
+            />
+            <input
+              type="text"
+              name="beneficiaries"
+              placeholder="Beneficiaries Served"
+              value={formData.beneficiaries}
+              onChange={handleChange}
+              required
+            />
+            <input
+              type="text"
+              name="areasOfFocus"
+              placeholder="Areas of Focus"
+              value={formData.areasOfFocus}
+              onChange={handleChange}
+              required
+            />
+          </>
+        )}
+
+        {/* Farmer-specific fields */}
+        {receiverType === "farmer" && (
+          <>
+            <input
+              type="text"
+              name="farmName"
+              placeholder="Farm Name"
+              value={formData.farmName}
+              onChange={handleChange}
+              required
+            />
+            <input
+              type="text"
+              name="farmSize"
+              placeholder="Farm Size (e.g., 5 acres)"
+              value={formData.farmSize}
+              onChange={handleChange}
+              required
+            />
+            <input
+              type="text"
+              name="cropType"
+              placeholder="Primary Crop Type"
+              value={formData.cropType}
+              onChange={handleChange}
+              required
+            />
+            <input
+              type="number"
+              name="maxFoodQuantity"
+              placeholder="Max Food Quantity (kg)"
+              value={formData.maxFoodQuantity}
+              onChange={handleChange}
+              required
+            />
+          </>
+        )}
 
         <button type="submit" className="signup-button">
           Sign Up
         </button>
       </form>
-      
+
       <section className="have-account">
         <p>
           Already have an account?{" "}
