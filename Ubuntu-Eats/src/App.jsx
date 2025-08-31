@@ -16,6 +16,12 @@ import NGOProfile from "./pages/NGOProfile";
 import ClaimedDonations from "./pages/ClaimedDonations";
 import FoodReceiver from "./pages/FoodReceiver";
 
+import VolunteerDashboard from "./pages/VolunteerDashboard";
+
+import VolunteerProfile from "./pages/VolunteerProfile";
+import MyDeliveries from "./pages/MyDeliveries";
+import AvailableDeliveries from "./pages/AvailableDeliveries";
+
 function App() {
   return (
     <Router>
@@ -29,6 +35,12 @@ function App() {
 
         <Route path="/NGOProfile" element={<NGOProfile />} />
         <Route path="/ClaimedDonations" element={<ClaimedDonations />} />
+
+        <Route path="/VolunteerDashboard" element={<VolunteerDashboard />} />
+        <Route path="/VolunteerProfile" element={<VolunteerProfile />} />
+
+        <Route path="/MyDeliveries" element={<MyDeliveries />} />
+        <Route path="/AvailableDeliveries" element={<AvailableDeliveries />} />
       </Routes>
     </Router>
   );
