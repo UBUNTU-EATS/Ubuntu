@@ -1,0 +1,313 @@
+/* VolunteerDashboard.css */
+.volunteer-dashboard {
+  min-height: 100vh;
+  background-color: #f9f9f9;
+  font-family: "Segoe UI", sans-serif;
+  width: 100vw;
+  overflow-x: hidden;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+/* Header Styles */
+.dashboard-header {
+  background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
+  color: white;
+  padding: 2rem;
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2rem;
+}
+
+.header-content h1 {
+  margin: 0 0 0.5rem 0;
+  font-size: 2.5rem;
+  font-weight: bold;
+}
+
+.welcome-text {
+  margin: 0;
+  font-size: 1.1rem;
+  opacity: 0.9;
+}
+
+.header-stats {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.stat-card {
+  background: rgba(255, 255, 255, 0.15);
+  padding: 1.5rem 2rem;
+  border-radius: 20px;
+  text-align: center;
+  min-width: 140px;
+  backdrop-filter: blur(15px);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  animation: slideInFromTop 0.8s cubic-bezier(0.4, 0, 0.2, 1) backwards;
+}
+
+.stat-card:nth-child(1) {
+  animation-delay: 0.2s;
+}
+
+.stat-card:nth-child(2) {
+  animation-delay: 0.4s;
+}
+
+.stat-card:nth-child(3) {
+  animation-delay: 0.6s;
+}
+
+@keyframes slideInFromTop {
+  from {
+    opacity: 0;
+    transform: translateY(-30px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.stat-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
+  transition: left 0.6s ease;
+}
+
+.stat-card:hover::before {
+  left: 100%;
+}
+
+.stat-card:hover {
+  background: rgba(255, 255, 255, 0.25);
+  transform: translateY(-8px) scale(1.05);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15),
+    0 5px 15px rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.stat-number {
+  display: block;
+  font-size: 2.5rem;
+  font-weight: 900;
+  color: #ffeb3b;
+  margin-bottom: 0.5rem;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3), 0 0 20px rgba(255, 235, 59, 0.5);
+  transition: all 0.3s ease;
+  animation: countUp 1s ease-out backwards;
+  animation-delay: calc(var(--delay, 0) + 0.5s);
+}
+
+@keyframes countUp {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.stat-card:hover .stat-number {
+  transform: scale(1.1);
+  text-shadow: 0 3px 6px rgba(0, 0, 0, 0.4), 0 0 30px rgba(255, 235, 59, 0.8);
+}
+
+.stat-label {
+  display: block;
+  font-size: 0.9rem;
+  opacity: 0.95;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  transition: all 0.3s ease;
+  animation: fadeInUp 0.6s ease backwards;
+  animation-delay: calc(var(--delay, 0) + 0.7s);
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 0.95;
+    transform: translateY(0);
+  }
+}
+
+.stat-card:hover .stat-label {
+  opacity: 1;
+  transform: translateY(-2px);
+  letter-spacing: 1px;
+}
+
+/* Navigation Tabs */
+.dashboard-nav {
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+  padding: 1.5rem 2rem 0;
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 2px solid #e2e8f0;
+  overflow-x: auto;
+  width: 100%;
+  box-sizing: border-box;
+  position: relative;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.dashboard-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.dashboard-nav::after {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 8px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.05), transparent);
+  pointer-events: none;
+}
+
+.nav-tab {
+  background: transparent;
+  border: none;
+  padding: 1rem 2rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  border-radius: 12px 12px 0 0;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+  flex-shrink: 0;
+  position: relative;
+  margin-bottom: -2px;
+  letter-spacing: 0.3px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.nav-tab:nth-child(1)::before {
+  content: "👤";
+  font-size: 1.1rem;
+}
+
+.nav-tab:nth-child(2)::before {
+  content: "🚗";
+  font-size: 1.1rem;
+}
+
+.nav-tab:nth-child(3)::before {
+  content: "📋";
+  font-size: 1.1rem;
+}
+
+.nav-tab:hover {
+  color: #2196f3;
+  background: rgba(33, 150, 243, 0.08);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.1);
+}
+
+.nav-tab.active {
+  color: #2196f3;
+  background: linear-gradient(135deg, #ffffff 0%, #e3f2fd 100%);
+  border: 2px solid #2196f3;
+  border-bottom: 2px solid #ffffff;
+  font-weight: 700;
+  box-shadow: 0 -4px 12px rgba(33, 150, 243, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  position: relative;
+  z-index: 2;
+}
+
+.nav-tab.active::after {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #2196f3, #ffeb3b, #2196f3);
+  border-radius: 2px 2px 0 0;
+}
+
+/* Main Content */
+.dashboard-content {
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  overflow-x: hidden;
+  width: 100%;
+  box-sizing: border-box;
+  position: relative;
+  overflow: hidden;
+}
+
+.dashboard-content > * {
+  animation: slideInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1) backwards;
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: center;
+    padding: 1.5rem 1rem;
+  }
+
+  .header-stats {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .dashboard-content {
+    padding: 1rem;
+  }
+
+  .volunteer-dashboard {
+    overflow-x: hidden;
+  }
+}
