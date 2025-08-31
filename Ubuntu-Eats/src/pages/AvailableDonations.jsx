@@ -326,13 +326,6 @@ const AvailableDonations = ({ donations, onClaim }) => {
           </div>
         </div>
       )}
-
-      {/* Notification Banner */}
-      <div className="notification-banner">
-        <div className="notification-content">
-          <span className="notification-icon">💡</span>
-        </div>
-      </div>
     </div>
   );
 };

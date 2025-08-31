@@ -6,6 +6,7 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 
 import "./App.css";
 import LandingPage from "./pages/LandingPage";
+import LandingChoice from "./pages/LandingChoice";
 import DonorDashboard from "./pages/DonorDashboard";
 import ReceiverSignup from "./pages/ReceiverSignup";
 import DonorSignup from "./pages/DonorSignup";
@@ -17,7 +18,7 @@ import ClaimedDonations from "./pages/ClaimedDonations";
 import FoodReceiver from "./pages/FoodReceiver";
 
 import VolunteerDashboard from "./pages/VolunteerDashboard";
-
+import VolunteerSignup from "./pages/VolunteerSignup";
 import VolunteerProfile from "./pages/VolunteerProfile";
 import MyDeliveries from "./pages/MyDeliveries";
 import AvailableDeliveries from "./pages/AvailableDeliveries";
@@ -27,6 +28,7 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/LandingChoice" element={<LandingChoice />} />
         <Route path="/donor-dashboard" element={<DonorDashboard />} />
         <Route path="/ReceiverSignup" element={<ReceiverSignup />} />
         <Route path="/DonorSignup" element={<DonorSignup />} />
@@ -38,7 +40,7 @@ function App() {
 
         <Route path="/VolunteerDashboard" element={<VolunteerDashboard />} />
         <Route path="/VolunteerProfile" element={<VolunteerProfile />} />
-
+        <Route path="/VolunteerSignup" element={<VolunteerSignup />} />
         <Route path="/MyDeliveries" element={<MyDeliveries />} />
         <Route path="/AvailableDeliveries" element={<AvailableDeliveries />} />
       </Routes>
