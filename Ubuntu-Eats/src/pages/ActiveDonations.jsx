@@ -1,7 +1,12 @@
 import React, { useState } from "react";
-import "../styles/ActveDonations.css"
+import "../styles/ActveDonations.css";
+
 const ActiveDonations = ({ donations, setDonations }) => {
   const [filter, setFilter] = useState("all");
+  const [chatOpen, setChatOpen] = useState(false);
+  const [activeChatDonation, setActiveChatDonation] = useState(null);
+  const [messages, setMessages] = useState({});
+  const [newMessage, setNewMessage] = useState("");
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -28,6 +33,89 @@ const ActiveDonations = ({ donations, setDonations }) => {
     );
   };
 
+  const openChat = (donation) => {
+    setActiveChatDonation(donation);
+    setChatOpen(true);
+    
+    // Initialize chat if it doesn't exist
+    if (!messages[donation.id]) {
+      setMessages(prev => ({
+        ...prev,
+        [donation.id]: [
+          {
+            id: 1,
+            sender: "system",
+            text: `Chat started for ${donation.foodType} donation`,
+            timestamp: Date.now(),
+            type: "system"
+          }
+        ]
+      }));
+    }
+  };
+
+  const closeChat = () => {
+    setChatOpen(false);
+    setActiveChatDonation(null);
+    setNewMessage("");
+  };
+
+  const sendMessage = () => {
+    if (!newMessage.trim() || !activeChatDonation) return;
+
+    const message = {
+      id: Date.now(),
+      sender: "donor",
+      text: newMessage.trim(),
+      timestamp: Date.now(),
+      type: "user"
+    };
+
+    setMessages(prev => ({
+      ...prev,
+      [activeChatDonation.id]: [
+        ...(prev[activeChatDonation.id] || []),
+        message
+      ]
+    }));
+
+    setNewMessage("");
+
+    // Simulate NGO response for demo
+    setTimeout(() => {
+      const responses = [
+        "Thanks! We'll be there in 15 minutes.",
+        "Perfect timing! Our volunteer is nearby.",
+        "Got it! Any special pickup instructions?",
+        "Excellent! We really appreciate this donation.",
+        "On our way! Should we use the main entrance?",
+        "Could you please have it ready at the loading dock?",
+        "Our driver will call when they arrive.",
+        "This will help feed 20 families tonight! 🙏"
+      ];
+      
+      const ngoResponse = {
+        id: Date.now() + 1,
+        sender: "ngo",
+        text: responses[Math.floor(Math.random() * responses.length)],
+        timestamp: Date.now() + 1000,
+        type: "user"
+      };
+
+      setMessages(prev => ({
+        ...prev,
+        [activeChatDonation.id]: [
+          ...(prev[activeChatDonation.id] || []),
+          ngoResponse
+        ]
+      }));
+    }, 1500 + Math.random() * 2000); // Random delay for realism
+  };
+
+  const setQuickMessage = (text) => {
+    setNewMessage(text);
+  };
+
   const filteredDonations = donations.filter(donation => {
     if (filter === "all") return true;
     return donation.status.toLowerCase().replace(" ", "-") === filter;
@@ -38,6 +126,14 @@ const ActiveDonations = ({ donations, setDonations }) => {
     return date.toLocaleDateString("en-ZA", {
       day: "2-digit",
       month: "short",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  };
+
+  const formatTime = (timestamp) => {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString("en-ZA", {
       hour: "2-digit",
       minute: "2-digit"
     });
@@ -95,9 +191,20 @@ const ActiveDonations = ({ donations, setDonations }) => {
                   <h3>{donation.foodType}</h3>
                   <p className="donation-quantity">{donation.quantity}</p>
                 </div>
-                <span className={`status-badge ${getStatusColor(donation.status)}`}>
-                  {donation.status}
-                </span>
+                <div className="header-actions">
+                  <span className={`status-badge ${getStatusColor(donation.status)}`}>
+                    {donation.status}
+                  </span>
+                  {donation.status !== "Completed" && donation.status !== "Cancelled" && (
+                    <button 
+                      className="chat-btn"
+                      onClick={() => openChat(donation)}
+                      title="Message volunteer"
+                    >
+                      💬
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="card-content">
@@ -188,6 +295,86 @@ const ActiveDonations = ({ donations, setDonations }) => {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Chat Popup Modal */}
+      {chatOpen && activeChatDonation && (
+        <div className="chat-overlay" onClick={closeChat}>
+          <div className="chat-popup" onClick={(e) => e.stopPropagation()}>
+            <div className="chat-header">
+              <div className="chat-info">
+                <h3>💬 Chat: {activeChatDonation.foodType}</h3>
+                <p>Coordinating with Green Valley NGO</p>
+              </div>
+              <button className="close-chat" onClick={closeChat}>
+                ✕
+              </button>
+            </div>
+
+            <div className="chat-messages">
+              {(messages[activeChatDonation.id] || []).map(message => (
+                <div 
+                  key={message.id} 
+                  className={`message ${message.type === "system" ? "system-message" : message.sender === "donor" ? "sent" : "received"}`}
+                >
+                  {message.type === "system" ? (
+                    <div className="system-text">{message.text}</div>
+                  ) : (
+                    <>
+                      <div className="message-content">
+                        <span className="message-text">{message.text}</span>
+                      </div>
+                      <div className="message-time">
+                        {formatTime(message.timestamp)}
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="chat-input-area">
+              <div className="quick-actions">
+                <button 
+                  className="quick-btn"
+                  onClick={() => setQuickMessage("Food is ready for pickup!")}
+                >
+                  📦 Ready
+                </button>
+                <button 
+                  className="quick-btn"
+                  onClick={() => setQuickMessage("Please use the back entrance")}
+                >
+                  🚪 Back Door
+                </button>
+                <button 
+                  className="quick-btn"
+                  onClick={() => setQuickMessage("Running 10 minutes late")}
+                >
+                  ⏰ Delayed
+                </button>
+              </div>
+              
+              <div className="input-container">
+                <input
+                  type="text"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  placeholder="Type your message..."
+                  className="chat-input"
+                  onKeyPress={(e) => e.key === "Enter" && sendMessage()}
+                />
+                <button 
+                  className="send-btn"
+                  onClick={sendMessage}
+                  disabled={!newMessage.trim()}
+                >
+                  📤
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
