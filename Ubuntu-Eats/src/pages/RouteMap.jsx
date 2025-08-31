@@ -9,14 +9,14 @@ const RouteMap = ({
   destinationLabel = "End",
 
 
-  
+
   originIcon = "📍",
   destinationIcon = "🏪",
   mapContainerStyle = { width: "100%", height: "300px" },
   zoom = 14,
   showRouteInfo = true,
   autoShowRoute = false,
-  apiKey = "AIzaSyDQ9fs_fzZaPY74GoAEe12vAxJmITjXzUE",
+  apiKey = "AIzaSyDGsQG8-0j79bK3_fzM_gCyt90IpIOvmd8",
   onRouteCalculated = null,
   className = "",
 }) => {

@@ -4,7 +4,7 @@ import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDQ9fs_fzZaPY74GoAEe12vAxJmITjXzUE",
+  apiKey: "AIzaSyDGsQG8-0j79bK3_fzM_gCyt90IpIOvmd8",
   authDomain: "ubuntu-eats.firebaseapp.com",
   projectId: "ubuntu-eats",
   storageBucket: "ubuntu-eats.firebasestorage.app",
