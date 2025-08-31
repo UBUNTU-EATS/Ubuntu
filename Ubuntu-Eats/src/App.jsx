@@ -6,14 +6,20 @@ import {BrowserRouter as Router, Routes, Route} from 'react-router-dom';
 
 import './App.css'
 import LandingPage from './pages/LandingPage';
-import MapWithDistance from './pages/MapWithDistance';
+import FarmersDashboard from './pages/FarmersDashboard';
+import IssuesPage from './pages/IssuePage';
+
 
 function App() {
   
   return (
     <Router>
       <Routes>
-        <Route path='/' element={<MapWithDistance/>} />
+        <Route path='/available-listings-farmers' element={<IssuesPage/>} />
+        <Route path="/farmers-dashboard" element={<FarmersDashboard/>} />
+        <Route path="/" element={<LandingPage/>} />
+
+
         </Routes>
     </Router>
   )
