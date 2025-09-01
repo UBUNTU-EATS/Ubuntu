@@ -10,21 +10,28 @@ const AvailableDeliveries = ({ deliveries, onAccept, maxDistance }) => {
   });
 
   const [selectedDelivery, setSelectedDelivery] = useState(null);
+  const [processing, setProcessing] = useState(null);
 
   // Parse max distance (remove " km" and convert to number)
   const maxDistanceValue = parseInt(maxDistance);
 
   const filteredDeliveries = deliveries.filter((delivery) => {
-    if (filters.category !== "all" && delivery.category !== filters.category) {
+    if (
+      filters.category !== "all" &&
+      delivery.typeOfFood !== filters.category
+    ) {
       return false;
     }
 
-    if (filters.urgency !== "all" && delivery.urgency !== filters.urgency) {
-      return false;
+    if (filters.urgency !== "all") {
+      const urgency = getUrgencyFromExpiry(delivery.expiryDate);
+      if (urgency !== filters.urgency) return false;
     }
 
     if (filters.distance === "withinRange") {
-      const deliveryDistance = parseFloat(delivery.distance);
+      // You might need to calculate distance based on volunteer location
+      // For now, we'll use a placeholder
+      const deliveryDistance = 10; // Placeholder - implement geolocation
       if (deliveryDistance > maxDistanceValue) return false;
     }
 
@@ -34,14 +41,26 @@ const AvailableDeliveries = ({ deliveries, onAccept, maxDistance }) => {
   const sortedDeliveries = [...filteredDeliveries].sort((a, b) => {
     if (filters.sortBy === "urgency") {
       const urgencyOrder = { high: 1, medium: 2, low: 3 };
-      return urgencyOrder[a.urgency] - urgencyOrder[b.urgency];
-    } else if (filters.sortBy === "distance") {
-      return parseFloat(a.distance) - parseFloat(b.distance);
+      const urgencyA = getUrgencyFromExpiry(a.expiryDate);
+      const urgencyB = getUrgencyFromExpiry(b.expiryDate);
+      return urgencyOrder[urgencyA] - urgencyOrder[urgencyB];
     } else if (filters.sortBy === "time") {
-      return new Date(a.pickupTime) - new Date(b.pickupTime);
+      return new Date(a.collectBy) - new Date(b.collectBy);
     }
     return 0;
   });
+
+  const getUrgencyFromExpiry = (expiryDate) => {
+    if (!expiryDate) return "medium";
+    const today = new Date();
+    const expiry = new Date(expiryDate);
+    const diffTime = expiry - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays <= 1) return "high";
+    if (diffDays <= 3) return "medium";
+    return "low";
+  };
 
   const handleFilterChange = (filterType, value) => {
     setFilters((prev) => ({
@@ -50,8 +69,9 @@ const AvailableDeliveries = ({ deliveries, onAccept, maxDistance }) => {
     }));
   };
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
+  const formatDate = (timestamp) => {
+    if (!timestamp) return "N/A";
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
     return date.toLocaleDateString("en-ZA", {
       day: "2-digit",
       month: "short",
@@ -62,24 +82,25 @@ const AvailableDeliveries = ({ deliveries, onAccept, maxDistance }) => {
 
   const getCategoryIcon = (category) => {
     switch (category) {
-      case "fresh-meals":
+      case "Fresh Meals":
         return "🍽️";
-      case "bakery":
+      case "Baked Goods":
         return "🥐";
-      case "fruits-vegetables":
+      case "Fruits & Vegetables":
         return "🥦";
-      case "dairy":
+      case "Dairy Products":
         return "🥛";
-      case "packaged-goods":
+      case "Packaged Food":
         return "📦";
-      case "beverages":
+      case "Beverages":
         return "🥤";
       default:
         return "📦";
     }
   };
 
-  const getUrgencyColor = (urgency) => {
+  const getUrgencyColor = (expiryDate) => {
+    const urgency = getUrgencyFromExpiry(expiryDate);
     switch (urgency) {
       case "high":
         return "urgent";
@@ -92,7 +113,8 @@ const AvailableDeliveries = ({ deliveries, onAccept, maxDistance }) => {
     }
   };
 
-  const getUrgencyText = (urgency) => {
+  const getUrgencyText = (expiryDate) => {
+    const urgency = getUrgencyFromExpiry(expiryDate);
     switch (urgency) {
       case "high":
         return "High Urgency";
@@ -105,9 +127,17 @@ const AvailableDeliveries = ({ deliveries, onAccept, maxDistance }) => {
     }
   };
 
-  const handleQuickAccept = (deliveryId) => {
-    onAccept(deliveryId);
-    setSelectedDelivery(null);
+  const handleQuickAccept = async (claimId) => {
+    setProcessing(claimId);
+    try {
+      await onAccept(claimId);
+      setSelectedDelivery(null);
+    } catch (error) {
+      console.error("Error accepting delivery:", error);
+      alert("Failed to accept delivery. Please try again.");
+    } finally {
+      setProcessing(null);
+    }
   };
 
   return (
@@ -130,12 +160,12 @@ const AvailableDeliveries = ({ deliveries, onAccept, maxDistance }) => {
             onChange={(e) => handleFilterChange("category", e.target.value)}
           >
             <option value="all">All Categories</option>
-            <option value="fresh-meals">Fresh Meals</option>
-            <option value="bakery">Bakery Items</option>
-            <option value="fruits-vegetables">Fruits & Vegetables</option>
-            <option value="dairy">Dairy Products</option>
-            <option value="packaged-goods">Packaged Goods</option>
-            <option value="beverages">Beverages</option>
+            <option value="Fresh Meals">Fresh Meals</option>
+            <option value="Baked Goods">Baked Goods</option>
+            <option value="Fruits & Vegetables">Fruits & Vegetables</option>
+            <option value="Dairy Products">Dairy Products</option>
+            <option value="Packaged Food">Packaged Food</option>
+            <option value="Beverages">Beverages</option>
           </select>
         </div>
 
@@ -173,7 +203,6 @@ const AvailableDeliveries = ({ deliveries, onAccept, maxDistance }) => {
             onChange={(e) => handleFilterChange("sortBy", e.target.value)}
           >
             <option value="urgency">Urgency</option>
-            <option value="distance">Distance</option>
             <option value="time">Pickup Time</option>
           </select>
         </div>
@@ -194,26 +223,28 @@ const AvailableDeliveries = ({ deliveries, onAccept, maxDistance }) => {
       ) : (
         <div className="deliveries-grid">
           {sortedDeliveries.map((delivery) => (
-            <div key={delivery.id} className="delivery-card">
+            <div key={delivery.claimId} className="delivery-card">
               <div className="card-header">
                 <div className="urgency-badge">
                   <span
                     className={`urgency-dot ${getUrgencyColor(
-                      delivery.urgency
+                      delivery.expiryDate
                     )}`}
                   ></span>
-                  {getUrgencyText(delivery.urgency)}
+                  {getUrgencyText(delivery.expiryDate)}
                 </div>
                 <div className="category-badge">
-                  {getCategoryIcon(delivery.category)}
-                  {delivery.category.replace("-", " ")}
+                  {getCategoryIcon(delivery.typeOfFood)}
+                  {delivery.typeOfFood}
                 </div>
               </div>
 
               <div className="card-content">
                 <div className="delivery-details">
                   <h3>{delivery.foodType}</h3>
-                  <p className="quantity">{delivery.quantity}</p>
+                  <p className="quantity">
+                    {delivery.quantity} {delivery.unit}
+                  </p>
                 </div>
 
                 <div className="route-info">
@@ -233,20 +264,18 @@ const AvailableDeliveries = ({ deliveries, onAccept, maxDistance }) => {
                     <div className="location-item">
                       <span className="location-label">From:</span>
                       <span className="location-value">
-                        {delivery.donorName}
+                        {delivery.listingCompany || delivery.donorName}
                       </span>
                       <span className="location-address">
-                        {delivery.pickupLocation}
+                        {delivery.address || delivery.location}
                       </span>
                     </div>
 
                     <div className="location-item">
                       <span className="location-label">To:</span>
-                      <span className="location-value">
-                        {delivery.recipientName}
-                      </span>
+                      <span className="location-value">{delivery.ngoName}</span>
                       <span className="location-address">
-                        {delivery.deliveryLocation}
+                        {delivery.ngoAddress || "Address not specified"}
                       </span>
                     </div>
                   </div>
@@ -254,21 +283,9 @@ const AvailableDeliveries = ({ deliveries, onAccept, maxDistance }) => {
 
                 <div className="delivery-meta">
                   <div className="meta-item">
-                    <span className="meta-label">📅 Pickup Time:</span>
+                    <span className="meta-label">📅 Pickup By:</span>
                     <span className="meta-value">
-                      {formatDate(delivery.pickupTime)}
-                    </span>
-                  </div>
-
-                  <div className="meta-item">
-                    <span className="meta-label">📏 Distance:</span>
-                    <span className="meta-value">{delivery.distance} km</span>
-                  </div>
-
-                  <div className="meta-item">
-                    <span className="meta-label">⏱️ Est. Time:</span>
-                    <span className="meta-value">
-                      ~{Math.round(parseFloat(delivery.distance) * 2)} min
+                      {formatDate(delivery.collectBy)}
                     </span>
                   </div>
 
@@ -291,9 +308,12 @@ const AvailableDeliveries = ({ deliveries, onAccept, maxDistance }) => {
                   </button>
                   <button
                     className="accept-btn"
-                    onClick={() => handleQuickAccept(delivery.id)}
+                    onClick={() => handleQuickAccept(delivery.claimId)}
+                    disabled={processing === delivery.claimId}
                   >
-                    Accept Delivery
+                    {processing === delivery.claimId
+                      ? "Processing..."
+                      : "Accept Delivery"}
                   </button>
                 </div>
               </div>
@@ -325,11 +345,11 @@ const AvailableDeliveries = ({ deliveries, onAccept, maxDistance }) => {
                 <div className="food-info">
                   <span className="food-type">{selectedDelivery.foodType}</span>
                   <span className="food-quantity">
-                    {selectedDelivery.quantity}
+                    {selectedDelivery.quantity} {selectedDelivery.unit}
                   </span>
                   <span className="food-category">
-                    {getCategoryIcon(selectedDelivery.category)}
-                    {selectedDelivery.category.replace("-", " ")}
+                    {getCategoryIcon(selectedDelivery.typeOfFood)}
+                    {selectedDelivery.typeOfFood}
                   </span>
                 </div>
               </div>
@@ -343,9 +363,12 @@ const AvailableDeliveries = ({ deliveries, onAccept, maxDistance }) => {
                       <span className="point-title">Pickup Location</span>
                     </div>
                     <div className="point-details">
-                      <p className="point-name">{selectedDelivery.donorName}</p>
+                      <p className="point-name">
+                        {selectedDelivery.listingCompany ||
+                          selectedDelivery.donorName}
+                      </p>
                       <p className="point-address">
-                        {selectedDelivery.pickupLocation}
+                        {selectedDelivery.address || selectedDelivery.location}
                       </p>
                     </div>
                   </div>
@@ -353,7 +376,8 @@ const AvailableDeliveries = ({ deliveries, onAccept, maxDistance }) => {
                   <div className="route-divider">
                     <div className="divider-line"></div>
                     <div className="distance-badge">
-                      {selectedDelivery.distance} km
+                      {/* You might want to calculate actual distance here */}
+                      ~10 km
                     </div>
                   </div>
 
@@ -363,11 +387,9 @@ const AvailableDeliveries = ({ deliveries, onAccept, maxDistance }) => {
                       <span className="point-title">Delivery Location</span>
                     </div>
                     <div className="point-details">
-                      <p className="point-name">
-                        {selectedDelivery.recipientName}
-                      </p>
+                      <p className="point-name">{selectedDelivery.ngoName}</p>
                       <p className="point-address">
-                        {selectedDelivery.deliveryLocation}
+                        {selectedDelivery.ngoAddress || "Address not specified"}
                       </p>
                     </div>
                   </div>
@@ -378,32 +400,19 @@ const AvailableDeliveries = ({ deliveries, onAccept, maxDistance }) => {
                 <h4>Delivery Information</h4>
                 <div className="delivery-info-grid">
                   <div className="info-item">
-                    <span className="info-label">📅 Pickup Time:</span>
+                    <span className="info-label">📅 Pickup By:</span>
                     <span className="info-value">
-                      {formatDate(selectedDelivery.pickupTime)}
-                    </span>
-                  </div>
-                  <div className="info-item">
-                    <span className="info-label">📏 Distance:</span>
-                    <span className="info-value">
-                      {selectedDelivery.distance} km
-                    </span>
-                  </div>
-                  <div className="info-item">
-                    <span className="info-label">⏱️ Est. Time:</span>
-                    <span className="info-value">
-                      ~{Math.round(parseFloat(selectedDelivery.distance) * 2)}{" "}
-                      minutes
+                      {formatDate(selectedDelivery.collectBy)}
                     </span>
                   </div>
                   <div className="info-item">
                     <span className="info-label">🚨 Urgency:</span>
                     <span
                       className={`info-value urgency-${getUrgencyColor(
-                        selectedDelivery.urgency
+                        selectedDelivery.expiryDate
                       )}`}
                     >
-                      {getUrgencyText(selectedDelivery.urgency)}
+                      {getUrgencyText(selectedDelivery.expiryDate)}
                     </span>
                   </div>
                 </div>
@@ -427,9 +436,12 @@ const AvailableDeliveries = ({ deliveries, onAccept, maxDistance }) => {
                 </button>
                 <button
                   className="modal-accept-btn"
-                  onClick={() => handleQuickAccept(selectedDelivery.id)}
+                  onClick={() => handleQuickAccept(selectedDelivery.claimId)}
+                  disabled={processing === selectedDelivery.claimId}
                 >
-                  Accept This Delivery
+                  {processing === selectedDelivery.claimId
+                    ? "Processing..."
+                    : "Accept This Delivery"}
                 </button>
               </div>
             </div>

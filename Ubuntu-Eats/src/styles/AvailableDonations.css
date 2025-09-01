@@ -1,4 +1,4 @@
-/* AvailableDonations.css */
+/* AvailableDonations.css - Fixed Image Styles */
 .available-donations {
   background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
   border-radius: 24px;
@@ -234,7 +234,7 @@
 }
 
 .donation-meta {
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
 }
 
 .meta-item {
@@ -285,6 +285,30 @@
 
 .urgency-normal {
   color: #059669;
+}
+
+/* Fixed Image Styles */
+.donation-image {
+  margin: 1.5rem 0;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.donation-image img {
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 3px solid #e2e8f0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.donation-image img:hover {
+  transform: scale(1.05);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+  border-color: #2e7d32;
 }
 
 .donation-actions {
@@ -392,6 +416,23 @@
   display: flex;
   flex-direction: column;
   gap: 2rem;
+}
+
+/* Fixed Modal Image Styles */
+.modal-image {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+
+.modal-image img {
+  width: 150px;
+  height: 150px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 3px solid #e2e8f0;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
 }
 
 .modal-section {
@@ -697,5 +738,16 @@
   .notification-content {
     flex-direction: column;
     text-align: center;
+  }
+
+  /* Responsive image adjustments */
+  .donation-image img {
+    width: 100px;
+    height: 100px;
+  }
+
+  .modal-image img {
+    width: 200px;
+    height: 150px;
   }
 }

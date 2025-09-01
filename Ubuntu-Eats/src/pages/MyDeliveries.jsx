@@ -2,15 +2,17 @@ import React, { useState } from "react";
 import "../styles/MyDeliveries.css";
 
 const MyDeliveries = ({ deliveries, onConfirmDelivery, onCancelDelivery }) => {
-  const [activeFilter, setActiveFilter] = useState("active");
+  const [activeFilter, setActiveFilter] = useState("CLAIMED");
+  const [processing, setProcessing] = useState(null);
 
   const filteredDeliveries = deliveries.filter((delivery) => {
     if (activeFilter === "all") return true;
     return delivery.status === activeFilter;
   });
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
+  const formatDate = (timestamp) => {
+    if (!timestamp) return "N/A";
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
     return date.toLocaleDateString("en-ZA", {
       day: "2-digit",
       month: "short",
@@ -21,11 +23,11 @@ const MyDeliveries = ({ deliveries, onConfirmDelivery, onCancelDelivery }) => {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case "accepted":
+      case "CLAIMED":
         return "status-accepted";
-      case "delivered":
+      case "COLLECTED":
         return "status-delivered";
-      case "cancelled":
+      case "CANCELLED":
         return "status-cancelled";
       default:
         return "status-accepted";
@@ -34,11 +36,11 @@ const MyDeliveries = ({ deliveries, onConfirmDelivery, onCancelDelivery }) => {
 
   const getStatusText = (status) => {
     switch (status) {
-      case "accepted":
+      case "CLAIMED":
         return "In Progress";
-      case "delivered":
+      case "COLLECTED":
         return "Delivered";
-      case "cancelled":
+      case "CANCELLED":
         return "Cancelled";
       default:
         return status;
@@ -47,33 +49,54 @@ const MyDeliveries = ({ deliveries, onConfirmDelivery, onCancelDelivery }) => {
 
   const getCategoryIcon = (category) => {
     switch (category) {
-      case "fresh-meals":
+      case "Fresh Meals":
         return "🍽️";
-      case "bakery":
+      case "Baked Goods":
         return "🥐";
-      case "fruits-vegetables":
+      case "Fruits & Vegetables":
         return "🥦";
-      case "dairy":
+      case "Dairy Products":
         return "🥛";
-      case "packaged-goods":
+      case "Packaged Food":
         return "📦";
-      case "beverages":
+      case "Beverages":
         return "🥤";
       default:
         return "📦";
     }
   };
 
-  const getUrgencyColor = (urgency) => {
-    switch (urgency) {
-      case "high":
-        return "urgent";
-      case "medium":
-        return "warning";
-      case "low":
-        return "normal";
-      default:
-        return "normal";
+  const getUrgencyColor = (expiryDate) => {
+    if (!expiryDate) return "normal";
+    const today = new Date();
+    const expiry = new Date(expiryDate);
+    const diffTime = expiry - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays <= 1) return "urgent";
+    if (diffDays <= 3) return "warning";
+    return "normal";
+  };
+
+  const handleConfirmDelivery = async (claimId, listingId) => {
+    setProcessing(claimId);
+    try {
+      await onConfirmDelivery(claimId, listingId);
+    } catch (error) {
+      console.error("Error confirming delivery:", error);
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  const handleCancelDelivery = async (claimId) => {
+    setProcessing(claimId);
+    try {
+      await onCancelDelivery(claimId);
+    } catch (error) {
+      console.error("Error canceling delivery:", error);
+    } finally {
+      setProcessing(null);
     }
   };
 
@@ -93,20 +116,18 @@ const MyDeliveries = ({ deliveries, onConfirmDelivery, onCancelDelivery }) => {
           All Deliveries ({deliveries.length})
         </button>
         <button
-          className={`filter-tab ${
-            activeFilter === "accepted" ? "active" : ""
-          }`}
-          onClick={() => setActiveFilter("accepted")}
+          className={`filter-tab ${activeFilter === "CLAIMED" ? "active" : ""}`}
+          onClick={() => setActiveFilter("CLAIMED")}
         >
-          Active ({deliveries.filter((d) => d.status === "accepted").length})
+          Active ({deliveries.filter((d) => d.status === "CLAIMED").length})
         </button>
         <button
           className={`filter-tab ${
-            activeFilter === "delivered" ? "active" : ""
+            activeFilter === "COLLECTED" ? "active" : ""
           }`}
-          onClick={() => setActiveFilter("delivered")}
+          onClick={() => setActiveFilter("COLLECTED")}
         >
-          Completed ({deliveries.filter((d) => d.status === "delivered").length}
+          Completed ({deliveries.filter((d) => d.status === "COLLECTED").length}
           )
         </button>
       </div>
@@ -127,12 +148,12 @@ const MyDeliveries = ({ deliveries, onConfirmDelivery, onCancelDelivery }) => {
       ) : (
         <div className="deliveries-list">
           {filteredDeliveries.map((delivery) => (
-            <div key={delivery.id} className="delivery-card">
+            <div key={delivery.claimId} className="delivery-card">
               <div className="card-header">
                 <div className="delivery-info">
                   <h3>{delivery.foodType}</h3>
                   <span className="accepted-date">
-                    Accepted on {formatDate(delivery.acceptedAt)}
+                    Accepted on {formatDate(delivery.volunteerAssignedAt)}
                   </span>
                 </div>
                 <div className="status-section">
@@ -144,8 +165,8 @@ const MyDeliveries = ({ deliveries, onConfirmDelivery, onCancelDelivery }) => {
                     {getStatusText(delivery.status)}
                   </span>
                   <div className="category-badge">
-                    {getCategoryIcon(delivery.category)}
-                    {delivery.category.replace("-", " ")}
+                    {getCategoryIcon(delivery.typeOfFood)}
+                    {delivery.typeOfFood}
                   </div>
                 </div>
               </div>
@@ -154,63 +175,41 @@ const MyDeliveries = ({ deliveries, onConfirmDelivery, onCancelDelivery }) => {
                 <div className="delivery-details">
                   <div className="detail-item">
                     <span className="detail-label">From:</span>
-                    <span className="detail-value">{delivery.donorName}</span>
-                  </div>
-                  <div className="detail-item">
-                    <span className="detail-label">To:</span>
                     <span className="detail-value">
-                      {delivery.recipientName}
+                      {delivery.listingCompany || delivery.donorName}
                     </span>
                   </div>
                   <div className="detail-item">
+                    <span className="detail-label">To:</span>
+                    <span className="detail-value">{delivery.ngoName}</span>
+                  </div>
+                  <div className="detail-item">
                     <span className="detail-label">Quantity:</span>
-                    <span className="detail-value">{delivery.quantity}</span>
+                    <span className="detail-value">
+                      {delivery.quantity} {delivery.unit}
+                    </span>
                   </div>
                 </div>
 
                 <div className="delivery-meta">
                   <div className="meta-item">
-                    <span className="meta-label">📅 Pickup Time:</span>
+                    <span className="meta-label">📅 Pickup By:</span>
                     <span className="meta-value">
-                      {formatDate(delivery.pickupTime)}
+                      {formatDate(delivery.collectBy)}
                     </span>
                   </div>
 
                   <div className="meta-item">
                     <span className="meta-label">📍 Pickup Location:</span>
                     <span className="meta-value">
-                      {delivery.pickupLocation}
+                      {delivery.address || delivery.location}
                     </span>
                   </div>
 
                   <div className="meta-item">
                     <span className="meta-label">🏠 Delivery Location:</span>
                     <span className="meta-value">
-                      {delivery.deliveryLocation}
-                    </span>
-                  </div>
-
-                  <div className="meta-item">
-                    <span className="meta-label">📏 Distance:</span>
-                    <span className="meta-value">{delivery.distance} km</span>
-                  </div>
-
-                  <div className="meta-item">
-                    <span className="meta-label">⏱️ Est. Time:</span>
-                    <span className="meta-value">
-                      {delivery.estimatedDeliveryTime}
-                    </span>
-                  </div>
-
-                  <div className="meta-item">
-                    <span className="meta-label">🚨 Urgency:</span>
-                    <span
-                      className={`meta-value urgency-${getUrgencyColor(
-                        delivery.urgency
-                      )}`}
-                    >
-                      {delivery.urgency.charAt(0).toUpperCase() +
-                        delivery.urgency.slice(1)}
+                      {delivery.ngoAddress || "Address not specified"}
                     </span>
                   </div>
 
@@ -224,7 +223,7 @@ const MyDeliveries = ({ deliveries, onConfirmDelivery, onCancelDelivery }) => {
                   )}
                 </div>
 
-                {delivery.status === "accepted" && (
+                {delivery.status === "CLAIMED" && (
                   <div className="delivery-progress">
                     <div className="progress-steps">
                       <div className="progress-step active">
@@ -245,7 +244,7 @@ const MyDeliveries = ({ deliveries, onConfirmDelivery, onCancelDelivery }) => {
                   </div>
                 )}
 
-                {delivery.status === "delivered" && delivery.deliveredAt && (
+                {delivery.status === "COLLECTED" && delivery.collectedAt && (
                   <div className="delivery-completed">
                     <div className="completion-info">
                       <span className="completed-icon">✅</span>
@@ -253,7 +252,7 @@ const MyDeliveries = ({ deliveries, onConfirmDelivery, onCancelDelivery }) => {
                         Successfully delivered!
                       </span>
                       <span className="completion-date">
-                        Delivered on {formatDate(delivery.deliveredAt)}
+                        Delivered on {formatDate(delivery.collectedAt)}
                       </span>
                     </div>
                   </div>
@@ -261,24 +260,32 @@ const MyDeliveries = ({ deliveries, onConfirmDelivery, onCancelDelivery }) => {
               </div>
 
               <div className="card-actions">
-                {delivery.status === "accepted" && (
+                {delivery.status === "CLAIMED" && (
                   <>
                     <button
                       className="action-btn secondary"
-                      onClick={() => onCancelDelivery(delivery.id)}
+                      onClick={() => handleCancelDelivery(delivery.claimId)}
+                      disabled={processing === delivery.claimId}
                     >
-                      Cancel Delivery
+                      {processing === delivery.claimId
+                        ? "Canceling..."
+                        : "Cancel Delivery"}
                     </button>
                     <button
                       className="action-btn primary"
-                      onClick={() => onConfirmDelivery(delivery.id)}
+                      onClick={() =>
+                        handleConfirmDelivery(delivery.claimId, delivery.id)
+                      }
+                      disabled={processing === delivery.claimId}
                     >
-                      Confirm Delivery
+                      {processing === delivery.claimId
+                        ? "Confirming..."
+                        : "Confirm Delivery"}
                     </button>
                   </>
                 )}
 
-                {delivery.status === "delivered" && (
+                {delivery.status === "COLLECTED" && (
                   <div className="completion-actions">
                     <button className="action-btn outline">View Details</button>
                     <button className="action-btn outline">
@@ -302,33 +309,9 @@ const MyDeliveries = ({ deliveries, onConfirmDelivery, onCancelDelivery }) => {
           </div>
           <div className="stat-item">
             <span className="stat-number">
-              {deliveries.filter((d) => d.status === "delivered").length}
+              {deliveries.filter((d) => d.status === "COLLECTED").length}
             </span>
             <span className="stat-label">Completed</span>
-          </div>
-          <div className="stat-item">
-            <span className="stat-number">
-              {deliveries
-                .reduce(
-                  (total, delivery) => total + parseFloat(delivery.distance),
-                  0
-                )
-                .toFixed(1)}{" "}
-              km
-            </span>
-            <span className="stat-label">Total Distance</span>
-          </div>
-          <div className="stat-item">
-            <span className="stat-number">
-              {Math.round(
-                deliveries.reduce(
-                  (total, delivery) => total + parseFloat(delivery.distance),
-                  0
-                ) * 2
-              )}{" "}
-              min
-            </span>
-            <span className="stat-label">Total Time</span>
           </div>
         </div>
       </div>
