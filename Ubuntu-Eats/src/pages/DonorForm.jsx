@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import "../styles/DonorForm.css";
-import { functions } from "../../firebaseConfig"; // Make sure this is properly configured
-import { httpsCallable } from "firebase/functions";
+import { auth } from "../../firebaseConfig";
 
 const DonationForm = ({ onSubmit, donorData }) => {
   const [formData, setFormData] = useState({
@@ -17,7 +16,7 @@ const DonationForm = ({ onSubmit, donorData }) => {
     contactPerson: donorData?.name || donorData?.companyName || "",
     contactPhone: donorData?.phone || "",
     pickupAddress: donorData?.address || "",
-    forFarmers: false, // Add the forFarmers field
+    forFarmers: false,
   });
 
   const [images, setImages] = useState([]);
@@ -25,12 +24,45 @@ const DonationForm = ({ onSubmit, donorData }) => {
   const [submitStatus, setSubmitStatus] = useState({ type: '', message: '' });
   const [dragActive, setDragActive] = useState(false);
 
+  // Your Firebase Functions base URL - update this with your project ID
+  const FUNCTIONS_BASE_URL = "https://us-central1-ubuntu-eats.cloudfunctions.net";
+
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
+  };
+
+  // Helper function to get auth token
+  const getAuthToken = async () => {
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+    return await user.getIdToken();
+  };
+
+  // Helper function to make authenticated HTTP requests
+  const makeAuthenticatedRequest = async (endpoint, data) => {
+    const token = await getAuthToken();
+    
+    const response = await fetch(`${FUNCTIONS_BASE_URL}/${endpoint}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(data)
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
   };
 
   const processFiles = (files) => {
@@ -114,32 +146,29 @@ const DonationForm = ({ onSubmit, donorData }) => {
     setSubmitStatus({ type: '', message: '' });
 
     try {
-      // Initialize Cloud Functions
-      const createDonationListing = httpsCallable(functions, 'createDonationListing');
-      const uploadDonationImage = httpsCallable(functions, 'uploadDonationImage');
-      const geocodeAddress = httpsCallable(functions, 'geocodeAddress');
-
-      // Get coordinates for the address
+      // Get coordinates for the address (optional)
       let coordinates = null;
       try {
-        const geoResult = await geocodeAddress({ address: formData.pickupAddress });
-        coordinates = geoResult.data.coordinates;
+        const geoResult = await makeAuthenticatedRequest('geocodeAddress', { 
+          address: formData.pickupAddress 
+        });
+        coordinates = geoResult.coordinates;
       } catch (geoError) {
-        console.warn("Could not geocode address, proceeding without coordinates");
+        console.warn("Could not geocode address, proceeding without coordinates:", geoError.message);
       }
 
       // Create the donation listing
-      const listingResult = await createDonationListing({
+      const listingResult = await makeAuthenticatedRequest('createDonationListing', {
         ...formData,
         donorData,
         coordinates
       });
 
-      if (!listingResult.data.success) {
-        throw new Error(listingResult.data.message || 'Failed to create listing');
+      if (!listingResult.success) {
+        throw new Error(listingResult.message || 'Failed to create listing');
       }
 
-      const listingID = listingResult.data.listingID;
+      const listingID = listingResult.listingID;
 
       // Upload images if any
       if (images.length > 0) {
@@ -147,7 +176,7 @@ const DonationForm = ({ onSubmit, donorData }) => {
           const image = images[i];
           try {
             const base64Data = await convertToBase64(image.file);
-            await uploadDonationImage({
+            await makeAuthenticatedRequest('uploadDonationImage', {
               listingID,
               imageData: base64Data,
               fileName: `image_${i + 1}_${image.name}`,
@@ -255,11 +284,10 @@ const DonationForm = ({ onSubmit, donorData }) => {
               >
                 <option value="">Select Category</option>
                 <option value="Fresh Meals">Fresh Meals</option>
-                <option value="Cooked Meals">Cooked Meals</option>
-                <option value="Baked Goods">Baked Goods</option>
-                <option value="Dairy Products">Dairy Products</option>
+                <option value="Packaged Food">Packaged Food</option>
                 <option value="Fruits & Vegetables">Fruits & Vegetables</option>
-                <option value="Packaged Foods">Packaged Foods</option>
+                <option value="Dairy Products">Dairy Products</option>
+                <option value="Baked Goods">Baked Goods</option>
                 <option value="Beverages">Beverages</option>
                 <option value="Other">Other</option>
               </select>
@@ -279,34 +307,31 @@ const DonationForm = ({ onSubmit, donorData }) => {
             </div>
 
             <div className="form-group">
-              <label htmlFor="unit">Unit *</label>
+              <label htmlFor="unit">Unit</label>
               <select
                 id="unit"
                 name="unit"
                 value={formData.unit}
                 onChange={handleInputChange}
-                required
               >
                 <option value="units">Units</option>
                 <option value="kg">Kilograms</option>
-                <option value="portions">Portions</option>
+                <option value="lbs">Pounds</option>
                 <option value="servings">Servings</option>
                 <option value="boxes">Boxes</option>
                 <option value="bags">Bags</option>
-                <option value="liters">Liters</option>
               </select>
             </div>
 
             <div className="form-group full-width">
-              <label htmlFor="description">Description *</label>
+              <label htmlFor="description">Description</label>
               <textarea
                 id="description"
                 name="description"
                 value={formData.description}
                 onChange={handleInputChange}
-                placeholder="Describe the food items, condition, ingredients, etc."
+                placeholder="Describe the food items, preparation details, ingredients, etc."
                 rows="3"
-                required
               />
             </div>
           </div>
@@ -380,20 +405,14 @@ const DonationForm = ({ onSubmit, donorData }) => {
         {/* Images */}
         <div className="form-section">
           <h3>Food Images (Optional)</h3>
+          
+          {/* Upload Area */}
           <div 
             className={`image-upload-area ${dragActive ? 'drag-active' : ''}`}
             onDragEnter={handleDrag}
             onDragLeave={handleDrag}
             onDragOver={handleDrag}
             onDrop={handleDrop}
-            style={{
-              border: '2px dashed #ccc',
-              borderRadius: '8px',
-              padding: '2rem',
-              textAlign: 'center',
-              cursor: 'pointer',
-              backgroundColor: dragActive ? '#f0f8ff' : '#fafafa'
-            }}
           >
             <input
               type="file"
@@ -404,63 +423,31 @@ const DonationForm = ({ onSubmit, donorData }) => {
               onChange={handleImageUpload}
               style={{ display: 'none' }}
             />
-            <label htmlFor="images" style={{ cursor: 'pointer' }}>
-              <div>📸 Click to upload images or drag and drop</div>
-              <small style={{ color: '#666', marginTop: '0.5rem', display: 'block' }}>
-                JPG, PNG (max 5MB each)
-              </small>
+            <label htmlFor="images" className="upload-label">
+              <div className="upload-icon">📸</div>
+              <p>Click to upload images or drag and drop</p>
+              <small>JPG, PNG (max 5MB each)</small>
             </label>
           </div>
 
-          {/* Image Preview */}
+          {/* Image Preview Grid */}
           {images.length > 0 && (
-            <div className="image-preview" style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-              gap: '1rem',
-              marginTop: '1rem'
-            }}>
+            <div className="image-preview-grid">
               {images.map((image) => (
-                <div key={image.id} style={{ position: 'relative' }}>
+                <div key={image.id} className="image-preview">
                   <img
                     src={image.url}
                     alt="Food preview"
-                    style={{
-                      width: '100%',
-                      height: '150px',
-                      objectFit: 'cover',
-                      borderRadius: '8px'
-                    }}
                   />
                   <button
                     type="button"
+                    className="remove-image"
                     onClick={() => removeImage(image.id)}
-                    style={{
-                      position: 'absolute',
-                      top: '5px',
-                      right: '5px',
-                      background: 'rgba(255, 0, 0, 0.7)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '50%',
-                      width: '24px',
-                      height: '24px',
-                      cursor: 'pointer'
-                    }}
+                    aria-label="Remove image"
                   >
                     ✕
                   </button>
-                  <div style={{
-                    fontSize: '0.8rem',
-                    padding: '0.25rem',
-                    backgroundColor: 'rgba(0,0,0,0.7)',
-                    color: 'white',
-                    position: 'absolute',
-                    bottom: '0',
-                    left: '0',
-                    right: '0',
-                    borderRadius: '0 0 8px 8px'
-                  }}>
+                  <div className="image-name">
                     {image.name}
                   </div>
                 </div>

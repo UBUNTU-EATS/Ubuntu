@@ -16,13 +16,36 @@ const corsWrapper = (handler) => {
   };
 };
 
-// Create a donation listing in foodListings collection
-exports.createDonationListing = functions.https.onCall(async (data, context) => {
+// Helper function to verify Firebase auth token
+const verifyAuth = async (req) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    throw new Error('No valid authorization header');
+  }
+
+  const token = authHeader.split('Bearer ')[1];
   try {
-    // Verify user is authenticated
-    if (!context.auth) {
-      throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+    const decodedToken = await admin.auth().verifyIdToken(token);
+    return decodedToken;
+  } catch (error) {
+    throw new Error('Invalid authentication token');
+  }
+};
+
+// Create a donation listing in foodListings collection
+exports.createDonationListing = functions.https.onRequest(corsWrapper(async (req, res) => {
+  try {
+    // Only allow POST requests
+    if (req.method !== 'POST') {
+      return res.status(405).json({
+        success: false,
+        message: 'Method not allowed. Use POST.'
+      });
     }
+
+    // Verify user authentication
+    const user = await verifyAuth(req);
+    console.log('Creating donation listing for user:', user.uid);
 
     const {
       foodType,
@@ -38,13 +61,19 @@ exports.createDonationListing = functions.https.onCall(async (data, context) => 
       pickupAddress,
       specialInstructions,
       donorData,
-      forFarmers = false, // Default to false if not provided
+      forFarmers = false,
       coordinates = null
-    } = data;
+    } = req.body;
+
+    console.log('Data received:', req.body);
 
     // Validate required fields
     if (!foodType || !category || !quantity || !pickupDate || !pickupTime || !pickupAddress) {
-      throw new functions.https.HttpsError('invalid-argument', 'Missing required fields');
+      console.log('Missing required fields:', { foodType, category, quantity, pickupDate, pickupTime, pickupAddress });
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: foodType, category, quantity, pickupDate, pickupTime, pickupAddress'
+      });
     }
 
     // Generate unique listing ID
@@ -75,13 +104,15 @@ exports.createDonationListing = functions.https.onCall(async (data, context) => 
       specialInstructions: specialInstructions || "",
       
       // Donor information
-      donorId: context.auth.uid,
-      donorEmail: context.auth.token.email,
+      donorId: user.uid,
+      donorEmail: user.email,
       
       // Timestamps
       createdAt: admin.firestore.Timestamp.now(),
       updatedAt: admin.firestore.Timestamp.now()
     };
+
+    console.log('Saving listing data:', listingData);
 
     // Save to foodListings collection
     await admin.firestore()
@@ -89,52 +120,115 @@ exports.createDonationListing = functions.https.onCall(async (data, context) => 
       .doc(listingID)
       .set(listingData);
 
-    console.log(`Created donation listing: ${listingID} for user: ${context.auth.uid}`);
+    console.log(`Created donation listing: ${listingID} for user: ${user.uid}`);
 
-    return {
+    return res.status(200).json({
       success: true,
       listingID: listingID,
       message: "Donation listing created successfully",
       data: listingData
-    };
+    });
 
   } catch (error) {
     console.error("Error creating donation listing:", error);
     
-    // Return more specific error messages
-    if (error instanceof functions.https.HttpsError) {
-      throw error;
+    if (error.message.includes('authorization') || error.message.includes('authentication')) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
     }
     
-    throw new functions.https.HttpsError('internal', `Failed to create donation listing: ${error.message}`);
+    return res.status(500).json({
+      success: false,
+      message: `Failed to create donation listing: ${error.message}`
+    });
   }
-});
+}));
 
-// Upload image for donation listing
-exports.uploadDonationImage = functions.https.onCall(async (data, context) => {
+// Geocode address function (simplified for now)
+exports.geocodeAddress = functions.https.onRequest(corsWrapper(async (req, res) => {
   try {
-    // Verify user is authenticated
-    if (!context.auth) {
-      throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+    // Only allow POST requests
+    if (req.method !== 'POST') {
+      return res.status(405).json({
+        success: false,
+        message: 'Method not allowed. Use POST.'
+      });
     }
 
-    const { listingID, imageData, fileName, contentType = 'image/jpeg' } = data;
+    const { address } = req.body;
+    
+    if (!address) {
+      return res.status(400).json({
+        success: false,
+        message: 'Address is required'
+      });
+    }
+
+    console.log(`Geocoding request for: ${address}`);
+    
+    // For now, return null coordinates
+    // You can implement actual geocoding using Google Maps API later
+    return res.status(200).json({
+      success: true,
+      coordinates: null, // [lat, lng] - implement actual geocoding service here
+      address: address,
+      message: "Geocoding completed (coordinates will be null for now)"
+    });
+
+  } catch (error) {
+    console.error("Error geocoding address:", error);
+    
+    return res.status(500).json({
+      success: false,
+      message: `Failed to geocode address: ${error.message}`
+    });
+  }
+}));
+
+// Upload donation image function
+exports.uploadDonationImage = functions.https.onRequest(corsWrapper(async (req, res) => {
+  try {
+    // Only allow POST requests
+    if (req.method !== 'POST') {
+      return res.status(405).json({
+        success: false,
+        message: 'Method not allowed. Use POST.'
+      });
+    }
+
+    // Verify user authentication
+    const user = await verifyAuth(req);
+
+    const { listingID, imageData, fileName, contentType = 'image/jpeg' } = req.body;
 
     if (!listingID || !imageData || !fileName) {
-      throw new functions.https.HttpsError('invalid-argument', 'Missing required image upload data');
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required image upload data: listingID, imageData, fileName'
+      });
     }
+
+    console.log(`Uploading image for listing: ${listingID}, file: ${fileName}`);
 
     // Verify the listing exists and belongs to the user
     const listingRef = admin.firestore().collection('foodListings').doc(listingID);
     const listingDoc = await listingRef.get();
 
     if (!listingDoc.exists) {
-      throw new functions.https.HttpsError('not-found', 'Listing not found');
+      return res.status(404).json({
+        success: false,
+        message: 'Listing not found'
+      });
     }
 
     const listingData = listingDoc.data();
-    if (listingData.donorId !== context.auth.uid) {
-      throw new functions.https.HttpsError('permission-denied', 'Access denied - not your listing');
+    if (listingData.donorId !== user.uid) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied - not your listing'
+      });
     }
 
     // Convert base64 to buffer
@@ -142,7 +236,10 @@ exports.uploadDonationImage = functions.https.onCall(async (data, context) => {
     
     // Validate image size (5MB limit)
     if (imageBuffer.length > 5 * 1024 * 1024) {
-      throw new functions.https.HttpsError('invalid-argument', 'Image too large (max 5MB)');
+      return res.status(400).json({
+        success: false,
+        message: 'Image too large (max 5MB)'
+      });
     }
     
     // Create storage reference with same listingID
@@ -156,7 +253,7 @@ exports.uploadDonationImage = functions.https.onCall(async (data, context) => {
         contentType: contentType,
         metadata: {
           listingID: listingID,
-          uploadedBy: context.auth.uid,
+          uploadedBy: user.uid,
           uploadedAt: new Date().toISOString()
         }
       }
@@ -168,174 +265,117 @@ exports.uploadDonationImage = functions.https.onCall(async (data, context) => {
     // Get public URL
     const publicUrl = `https://storage.googleapis.com/${bucket.name}/${imagePath}`;
 
-    // Update listing with image URL
+    // Update listing with image URL (for single image)
+    // If you want multiple images, you'd need to modify this to append to an array
     await listingRef.update({
       imageURL: publicUrl,
       imagePath: imagePath,
       updatedAt: admin.firestore.Timestamp.now()
     });
 
-    console.log(`Uploaded image for listing: ${listingID}`);
+    console.log(`Successfully uploaded image for listing: ${listingID}`);
 
-    return {
+    return res.status(200).json({
       success: true,
       imageURL: publicUrl,
       imagePath: imagePath,
       message: "Image uploaded successfully"
-    };
+    });
 
   } catch (error) {
     console.error("Error uploading image:", error);
     
-    if (error instanceof functions.https.HttpsError) {
-      throw error;
+    if (error.message.includes('authorization') || error.message.includes('authentication')) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
     }
     
-    throw new functions.https.HttpsError('internal', `Failed to upload image: ${error.message}`);
+    return res.status(500).json({
+      success: false,
+      message: `Failed to upload image: ${error.message}`
+    });
   }
-});
+}));
 
 // Update donation listing status
-exports.updateDonationStatus = functions.https.onCall(async (data, context) => {
+exports.updateDonationStatus = functions.https.onRequest(corsWrapper(async (req, res) => {
   try {
-    if (!context.auth) {
-      throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+    // Only allow POST requests
+    if (req.method !== 'POST') {
+      return res.status(405).json({
+        success: false,
+        message: 'Method not allowed. Use POST.'
+      });
     }
 
-    const { listingID, status, claimedBy = null } = data;
+    // Verify user authentication
+    const user = await verifyAuth(req);
+
+    const { listingID, status } = req.body;
 
     if (!listingID || !status) {
-      throw new functions.https.HttpsError('invalid-argument', 'Missing required fields');
+      return res.status(400).json({
+        success: false,
+        message: 'ListingID and status are required'
+      });
     }
 
-    const validStatuses = ['UNCLAIMED', 'CLAIMED', 'PICKED_UP', 'COMPLETED', 'CANCELLED'];
+    // Valid statuses
+    const validStatuses = ['UNCLAIMED', 'PENDING_PICKUP', 'COMPLETED', 'CANCELLED'];
     if (!validStatuses.includes(status)) {
-      throw new functions.https.HttpsError('invalid-argument', 'Invalid status value');
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid status. Valid statuses: ' + validStatuses.join(', ')
+      });
     }
 
-    const updateData = {
+    const listingRef = admin.firestore().collection('foodListings').doc(listingID);
+    const listingDoc = await listingRef.get();
+
+    if (!listingDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Listing not found'
+      });
+    }
+
+    const listingData = listingDoc.data();
+    if (listingData.donorId !== user.uid) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied - not your listing'
+      });
+    }
+
+    await listingRef.update({
       listingStatus: status,
       updatedAt: admin.firestore.Timestamp.now()
-    };
-
-    if (claimedBy) {
-      updateData.claimedBy = claimedBy;
-      updateData.claimedAt = admin.firestore.Timestamp.now();
-    }
-
-    await admin.firestore()
-      .collection('foodListings')
-      .doc(listingID)
-      .update(updateData);
+    });
 
     console.log(`Updated listing ${listingID} status to: ${status}`);
 
-    return {
+    return res.status(200).json({
       success: true,
-      message: `Listing status updated to ${status}`,
-      updatedFields: updateData
-    };
+      listingID: listingID,
+      newStatus: status,
+      message: "Status updated successfully"
+    });
 
   } catch (error) {
     console.error("Error updating donation status:", error);
     
-    if (error instanceof functions.https.HttpsError) {
-      throw error;
-    }
-    
-    throw new functions.https.HttpsError('internal', `Failed to update donation status: ${error.message}`);
-  }
-});
-
-// Get coordinates from address (using a geocoding service)
-exports.geocodeAddress = functions.https.onCall(async (data, context) => {
-  try {
-    if (!context.auth) {
-      throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
-    }
-
-    const { address } = data;
-    
-    if (!address) {
-      throw new functions.https.HttpsError('invalid-argument', 'Address is required');
-    }
-    
-    // This is a placeholder - you'll need to integrate with a geocoding service
-    // like Google Geocoding API, Mapbox, or similar
-    
-    // For now, return sample coordinates for Johannesburg area based on address
-    let coordinates = [-26.2041, 28.0473]; // Default Johannesburg coordinates
-    
-    // Simple address-based coordinate mapping for South African cities
-    const addressLower = address.toLowerCase();
-    if (addressLower.includes('cape town') || addressLower.includes('capetown')) {
-      coordinates = [-33.9249, 18.4241];
-    } else if (addressLower.includes('durban')) {
-      coordinates = [-29.8587, 31.0218];
-    } else if (addressLower.includes('pretoria')) {
-      coordinates = [-25.7479, 28.2293];
-    } else if (addressLower.includes('port elizabeth') || addressLower.includes('gqeberha')) {
-      coordinates = [-33.9608, 25.6022];
-    } else if (addressLower.includes('bloemfontein')) {
-      coordinates = [-29.0852, 26.1596];
-    }
-    
-    console.log(`Geocoded address "${address}" to coordinates:`, coordinates);
-    
-    return {
-      success: true,
-      coordinates: coordinates,
-      address: address,
-      message: "Coordinates retrieved successfully"
-    };
-
-  } catch (error) {
-    console.error("Error geocoding address:", error);
-    
-    if (error instanceof functions.https.HttpsError) {
-      throw error;
-    }
-    
-    throw new functions.https.HttpsError('internal', `Failed to geocode address: ${error.message}`);
-  }
-});
-
-// Development/Testing endpoint to list all donations
-exports.getDonations = functions.https.onCall(async (data, context) => {
-  try {
-    if (!context.auth) {
-      throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
-    }
-
-    const { limit = 10, status = null } = data;
-
-    let query = admin.firestore()
-      .collection('foodListings')
-      .orderBy('dateListed', 'desc')
-      .limit(limit);
-
-    if (status) {
-      query = query.where('listingStatus', '==', status);
-    }
-
-    const snapshot = await query.get();
-    const donations = [];
-
-    snapshot.forEach(doc => {
-      donations.push({
-        id: doc.id,
-        ...doc.data()
+    if (error.message.includes('authorization') || error.message.includes('authentication')) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
       });
+    }
+    
+    return res.status(500).json({
+      success: false,
+      message: `Failed to update donation status: ${error.message}`
     });
-
-    return {
-      success: true,
-      donations: donations,
-      count: donations.length
-    };
-
-  } catch (error) {
-    console.error("Error fetching donations:", error);
-    throw new functions.https.HttpsError('internal', 'Failed to fetch donations');
   }
-});
+}));
