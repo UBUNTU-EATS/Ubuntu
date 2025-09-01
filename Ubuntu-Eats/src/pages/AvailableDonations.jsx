@@ -326,18 +326,6 @@ const AvailableDonations = ({ donations, onClaim }) => {
           </div>
         </div>
       )}
-
-      {/* Notification Banner */}
-      <div className="notification-banner">
-        <div className="notification-content">
-          <span className="notification-icon">💡</span>
-          <p>
-            <strong>Pro Tip:</strong> Claim donations quickly as they're
-            available for a limited time. Donations near expiry will be
-            prioritized in your area.
-          </p>
-        </div>
-      </div>
     </div>
   );
 };

@@ -1,5 +1,5 @@
-/* VolunteerDashboard.css */
-.volunteer-dashboard {
+/* AdminDashboard.css */
+.admin-dashboard {
   min-height: 100vh;
   background-color: #f9f9f9;
   font-family: "Segoe UI", sans-serif;
@@ -29,9 +29,16 @@
 }
 
 .welcome-text {
-  margin: 0;
+  margin: 0 0 0.25rem 0;
   font-size: 1.1rem;
   opacity: 0.9;
+}
+
+.admin-role {
+  margin: 0;
+  font-size: 0.9rem;
+  opacity: 0.7;
+  font-style: italic;
 }
 
 .header-stats {
@@ -65,6 +72,10 @@
 
 .stat-card:nth-child(3) {
   animation-delay: 0.6s;
+}
+
+.stat-card:nth-child(4) {
+  animation-delay: 0.8s;
 }
 
 @keyframes slideInFromTop {
@@ -214,34 +225,34 @@
 }
 
 .nav-tab:nth-child(1)::before {
-  content: "👤";
+  content: "👥";
   font-size: 1.1rem;
 }
 
 .nav-tab:nth-child(2)::before {
-  content: "🚗";
+  content: "✅";
   font-size: 1.1rem;
 }
 
 .nav-tab:nth-child(3)::before {
-  content: "📋";
+  content: "📊";
   font-size: 1.1rem;
 }
 
 .nav-tab:hover {
   color: #2e7d32;
-  background: rgba(33, 150, 243, 0.08);
+  background: rgba(103, 58, 183, 0.08);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.1);
+  box-shadow: 0 4px 12px rgba(103, 58, 183, 0.1);
 }
 
 .nav-tab.active {
   color: #2e7d32;
-  background: linear-gradient(135deg, #ffffff 0%, #e3f2fd 100%);
+  background: linear-gradient(135deg, #ffffff 0%, #f3e5f5 100%);
   border: 2px solid #2e7d32;
   border-bottom: 2px solid #ffffff;
   font-weight: 700;
-  box-shadow: 0 -4px 12px rgba(33, 150, 243, 0.15),
+  box-shadow: 0 -4px 12px rgba(103, 58, 183, 0.15),
     inset 0 1px 0 rgba(255, 255, 255, 0.8);
   position: relative;
   z-index: 2;
@@ -254,14 +265,14 @@
   left: 0;
   right: 0;
   height: 4px;
-  background: linear-gradient(90deg, #2e7d32, #ffeb3b, #2e7d32);
+  background: linear-gradient(90deg, #2e7d32, #e91e63, #2e7d32);
   border-radius: 2px 2px 0 0;
 }
 
 /* Main Content */
 .dashboard-content {
   padding: 2rem;
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
   overflow-x: hidden;
   width: 100%;
@@ -307,7 +318,7 @@
     padding: 1rem;
   }
 
-  .volunteer-dashboard {
+  .admin-dashboard {
     overflow-x: hidden;
   }
 }

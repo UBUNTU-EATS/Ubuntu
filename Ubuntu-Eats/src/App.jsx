@@ -6,10 +6,11 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 
 import "./App.css";
 import LandingPage from "./pages/LandingPage";
-import DonorDashboard from "./pages/DonorDashboard";
-import ReceiverSignup from "./pages/ReceiverSignup";
-import DonorSignup from "./pages/DonorSignup";
 
+import DonorDashboard from "./pages/DonorDashboard";
+
+
+import AuthContainer from "./pages/AuthContainer";
 import NGODashboard from "./pages/NGODashboard";
 
 import NGOProfile from "./pages/NGOProfile";
@@ -20,14 +21,18 @@ import FarmersDashboard from './pages/FarmersDashboard';
 import IssuesPage from './pages/IssuePage';
 
 
+import AdminDashboard from "./pages/AdminDashboard";
+import SystemAnalytics from "./pages/SystemAnalytics";
+import DonationApprovals from "./pages/DonationApprovals";
+import UserManagement from "./pages/UserManagement";
+
 function App() {
   return (
     <Router>
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/donor-dashboard" element={<DonorDashboard />} />
-        <Route path="/ReceiverSignup" element={<ReceiverSignup />} />
-        <Route path="/DonorSignup" element={<DonorSignup />} />
+        <Route path="/AuthContainer" element={<AuthContainer />} />
         <Route path="/NGODashboard" element={<NGODashboard />} />
         <Route path="/FoodReceiver" element={<FoodReceiver />} />
         <Route path="/farmers-dashboard" element={<FarmersDashboard />} />
@@ -38,6 +43,17 @@ function App() {
 
         <Route path="/NGOProfile" element={<NGOProfile />} />
         <Route path="/ClaimedDonations" element={<ClaimedDonations />} />
+
+        <Route path="/VolunteerDashboard" element={<VolunteerDashboard />} />
+        <Route path="/VolunteerProfile" element={<VolunteerProfile />} />
+        <Route path="/UnifiedSignup" element={<UnifiedSignup />} />
+        <Route path="/MyDeliveries" element={<MyDeliveries />} />
+        <Route path="/AvailableDeliveries" element={<AvailableDeliveries />} />
+
+        <Route path="/AdminDashboard" element={<AdminDashboard />} />
+        <Route path="/SystemAnalytics" element={<SystemAnalytics />} />
+        <Route path="/DonationApprovals" element={<DonationApprovals />} />
+        <Route path="/UserManagement" element={<UserManagement />} />
       </Routes>
     </Router>
   );

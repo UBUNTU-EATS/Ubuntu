@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import "../styles/ActveDonations.css"
+import "../styles/ActveDonations.css";
 const ActiveDonations = ({ donations, setDonations }) => {
   const [filter, setFilter] = useState("all");
 
@@ -19,8 +19,8 @@ const ActiveDonations = ({ donations, setDonations }) => {
   };
 
   const updateStatus = (donationId, newStatus) => {
-    setDonations(prev =>
-      prev.map(donation =>
+    setDonations((prev) =>
+      prev.map((donation) =>
         donation.id === donationId
           ? { ...donation, status: newStatus }
           : donation
@@ -28,7 +28,7 @@ const ActiveDonations = ({ donations, setDonations }) => {
     );
   };
 
-  const filteredDonations = donations.filter(donation => {
+  const filteredDonations = donations.filter((donation) => {
     if (filter === "all") return true;
     return donation.status.toLowerCase().replace(" ", "-") === filter;
   });
@@ -39,7 +39,7 @@ const ActiveDonations = ({ donations, setDonations }) => {
       day: "2-digit",
       month: "short",
       hour: "2-digit",
-      minute: "2-digit"
+      minute: "2-digit",
     });
   };
 
@@ -48,29 +48,34 @@ const ActiveDonations = ({ donations, setDonations }) => {
       <div className="donations-header">
         <h2>Active Donations</h2>
         <div className="filter-tabs">
-          <button 
+          <button
             className={`filter-tab ${filter === "all" ? "active" : ""}`}
             onClick={() => setFilter("all")}
           >
             All ({donations.length})
           </button>
-          <button 
-            className={`filter-tab ${filter === "pending-pickup" ? "active" : ""}`}
+          <button
+            className={`filter-tab ${
+              filter === "pending-pickup" ? "active" : ""
+            }`}
             onClick={() => setFilter("pending-pickup")}
           >
-            Pending ({donations.filter(d => d.status === "Pending Pickup").length})
+            Pending (
+            {donations.filter((d) => d.status === "Pending Pickup").length})
           </button>
-          <button 
+          <button
             className={`filter-tab ${filter === "in-transit" ? "active" : ""}`}
             onClick={() => setFilter("in-transit")}
           >
-            In Transit ({donations.filter(d => d.status === "In Transit").length})
+            In Transit (
+            {donations.filter((d) => d.status === "In Transit").length})
           </button>
-          <button 
+          <button
             className={`filter-tab ${filter === "completed" ? "active" : ""}`}
             onClick={() => setFilter("completed")}
           >
-            Completed ({donations.filter(d => d.status === "Completed").length})
+            Completed (
+            {donations.filter((d) => d.status === "Completed").length})
           </button>
         </div>
       </div>
@@ -80,22 +85,23 @@ const ActiveDonations = ({ donations, setDonations }) => {
           <div className="empty-icon">📦</div>
           <h3>No donations found</h3>
           <p>
-            {filter === "all" 
+            {filter === "all"
               ? "You haven't made any donations yet. Start by clicking the 'Donate Food' tab."
-              : `No donations with status "${filter.replace("-", " ")}" found.`
-            }
+              : `No donations with status "${filter.replace("-", " ")}" found.`}
           </p>
         </div>
       ) : (
         <div className="donations-grid">
-          {filteredDonations.map(donation => (
+          {filteredDonations.map((donation) => (
             <div key={donation.id} className="donation-card">
               <div className="card-header">
                 <div className="donation-info">
                   <h3>{donation.foodType}</h3>
                   <p className="donation-quantity">{donation.quantity}</p>
                 </div>
-                <span className={`status-badge ${getStatusColor(donation.status)}`}>
+                <span
+                  className={`status-badge ${getStatusColor(donation.status)}`}
+                >
                   {donation.status}
                 </span>
               </div>
@@ -123,7 +129,9 @@ const ActiveDonations = ({ donations, setDonations }) => {
                 {donation.specialInstructions && (
                   <div className="info-row">
                     <span className="info-label">⚠️ Instructions:</span>
-                    <span className="info-value">{donation.specialInstructions}</span>
+                    <span className="info-value">
+                      {donation.specialInstructions}
+                    </span>
                   </div>
                 )}
 
@@ -131,10 +139,10 @@ const ActiveDonations = ({ donations, setDonations }) => {
                   <div className="donation-images">
                     <span className="info-label">🖼️ Images:</span>
                     <div className="images-thumbnails">
-                      {donation.images.slice(0, 3).map(image => (
-                        <img 
-                          key={image.id} 
-                          src={image.url} 
+                      {donation.images.slice(0, 3).map((image) => (
+                        <img
+                          key={image.id}
+                          src={image.url}
                           alt={image.name}
                           className="image-thumbnail"
                         />
@@ -152,13 +160,13 @@ const ActiveDonations = ({ donations, setDonations }) => {
               <div className="card-actions">
                 {donation.status === "Pending Pickup" && (
                   <>
-                    <button 
+                    <button
                       className="action-btn secondary"
                       onClick={() => updateStatus(donation.id, "Cancelled")}
                     >
                       Cancel
                     </button>
-                    <button 
+                    <button
                       className="action-btn primary"
                       onClick={() => updateStatus(donation.id, "In Transit")}
                     >
@@ -166,9 +174,9 @@ const ActiveDonations = ({ donations, setDonations }) => {
                     </button>
                   </>
                 )}
-                
+
                 {donation.status === "In Transit" && (
-                  <button 
+                  <button
                     className="action-btn primary"
                     onClick={() => updateStatus(donation.id, "Completed")}
                   >
@@ -178,13 +186,13 @@ const ActiveDonations = ({ donations, setDonations }) => {
 
                 {donation.status === "Completed" && (
                   <div className="completion-info">
-                    <span className="completed-text">✅ Successfully donated!</span>
+                    <span className="completed-text">
+                      ✅ Successfully donated!
+                    </span>
                   </div>
                 )}
 
-                <button className="action-btn outline">
-                  View Details
-                </button>
+                <button className="action-btn outline">View Details</button>
               </div>
             </div>
           ))}

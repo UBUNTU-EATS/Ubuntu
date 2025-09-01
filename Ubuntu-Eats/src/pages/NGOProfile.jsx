@@ -1,9 +1,43 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "../styles/NGOProfile.css";
+import { db, auth } from "../../firebaseConfig";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 
-const NGOProfile = ({ ngoData, setNgoData }) => {
+const NGOProfile = () => {
+  const [ngoData, setNgoData] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState(ngoData);
+  const [formData, setFormData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch NGO profile from Firestore
+  useEffect(() => {
+    const fetchNGO = async () => {
+      try {
+        const user = auth.currentUser;
+        if (!user) {
+          console.error("User not logged in");
+          setLoading(false);
+          return;
+        }
+
+        const docRef = doc(db, "ngos", user.uid);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+          setNgoData(docSnap.data());
+          setFormData(docSnap.data());
+        } else {
+          console.error("No NGO profile found for this user.");
+        }
+      } catch (err) {
+        console.error("Error fetching NGO profile:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchNGO();
+  }, []);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -13,16 +47,34 @@ const NGOProfile = ({ ngoData, setNgoData }) => {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setNgoData(formData);
-    setIsEditing(false);
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+
+      const docRef = doc(db, "ngos", user.uid);
+      await updateDoc(docRef, formData);
+
+      setNgoData(formData);
+      setIsEditing(false);
+    } catch (err) {
+      console.error("Error updating NGO profile:", err);
+    }
   };
 
   const handleCancel = () => {
     setFormData(ngoData);
     setIsEditing(false);
   };
+
+  if (loading) {
+    return <p>Loading NGO Profile...</p>;
+  }
+
+  if (!ngoData) {
+    return <p>No NGO profile found.</p>;
+  }
 
   return (
     <div className="ngo-profile">
@@ -51,7 +103,7 @@ const NGOProfile = ({ ngoData, setNgoData }) => {
                     type="text"
                     id="name"
                     name="name"
-                    value={formData.name}
+                    value={formData.name || ""}
                     onChange={handleInputChange}
                     required
                   />
@@ -63,7 +115,7 @@ const NGOProfile = ({ ngoData, setNgoData }) => {
                     type="email"
                     id="email"
                     name="email"
-                    value={formData.email}
+                    value={formData.email || ""}
                     onChange={handleInputChange}
                     required
                   />
@@ -75,7 +127,7 @@ const NGOProfile = ({ ngoData, setNgoData }) => {
                     type="tel"
                     id="phone"
                     name="phone"
-                    value={formData.phone}
+                    value={formData.phone || ""}
                     onChange={handleInputChange}
                     required
                   />
@@ -89,7 +141,7 @@ const NGOProfile = ({ ngoData, setNgoData }) => {
                     type="text"
                     id="registrationNumber"
                     name="registrationNumber"
-                    value={formData.registrationNumber}
+                    value={formData.registrationNumber || ""}
                     onChange={handleInputChange}
                     required
                   />
@@ -100,7 +152,7 @@ const NGOProfile = ({ ngoData, setNgoData }) => {
                   <textarea
                     id="address"
                     name="address"
-                    value={formData.address}
+                    value={formData.address || ""}
                     onChange={handleInputChange}
                     rows="3"
                     required
@@ -113,7 +165,7 @@ const NGOProfile = ({ ngoData, setNgoData }) => {
                     type="text"
                     id="beneficiaries"
                     name="beneficiaries"
-                    value={formData.beneficiaries}
+                    value={formData.beneficiaries || ""}
                     onChange={handleInputChange}
                     placeholder="e.g., 250 families weekly"
                     required

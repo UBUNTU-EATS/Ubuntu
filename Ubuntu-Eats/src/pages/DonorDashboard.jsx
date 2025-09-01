@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import DonorProfile from "./DomorProfile";
+import DonorProfile from "./DonorProfile";
 import DonationForm from "./DonorForm";
 import ActiveDonations from "./ActiveDonations";
 import "../styles/DonorDashboard.css";
@@ -11,7 +11,7 @@ const DonorDashboard = () => {
     email: "info@greenvalley.com",
     phone: "+27 11 123 4567",
     address: "123 Main St, Johannesburg, Gauteng",
-    businessType: "Restaurant"
+    businessType: "Restaurant",
   });
 
   const [donations, setDonations] = useState([
@@ -21,15 +21,15 @@ const DonorDashboard = () => {
       quantity: "20 units",
       status: "Pending Pickup",
       scheduledTime: "2025-08-31 14:00",
-      location: "Green Valley Restaurant"
-    }
+      location: "Green Valley Restaurant",
+    },
   ]);
 
   const addDonation = (newDonation) => {
     const donation = {
       ...newDonation,
       id: Date.now(),
-      status: "Pending Pickup"
+      status: "Pending Pickup",
     };
     setDonations([...donations, donation]);
     setActiveTab("active"); // Switch to active donations tab
@@ -61,19 +61,19 @@ const DonorDashboard = () => {
 
       {/* Navigation Tabs */}
       <nav className="dashboard-nav">
-        <button 
+        <button
           className={`nav-tab ${activeTab === "profile" ? "active" : ""}`}
           onClick={() => setActiveTab("profile")}
         >
           My Profile
         </button>
-        <button 
+        <button
           className={`nav-tab ${activeTab === "donate" ? "active" : ""}`}
           onClick={() => setActiveTab("donate")}
         >
           Donate Food
         </button>
-        <button 
+        <button
           className={`nav-tab ${activeTab === "active" ? "active" : ""}`}
           onClick={() => setActiveTab("active")}
         >
@@ -86,11 +86,11 @@ const DonorDashboard = () => {
         {activeTab === "profile" && (
           <DonorProfile donorData={donorData} setDonorData={setDonorData} />
         )}
-        
+
         {activeTab === "donate" && (
           <DonationForm onSubmit={addDonation} donorData={donorData} />
         )}
-        
+
         {activeTab === "active" && (
           <ActiveDonations donations={donations} setDonations={setDonations} />
         )}
