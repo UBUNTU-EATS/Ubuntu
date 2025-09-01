@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import "../styles/DonorForm.css";
+import { functions } from "../../firebaseConfig"; // Make sure this is properly configured
+import { httpsCallable } from "firebase/functions";
 
 const DonationForm = ({ onSubmit, donorData }) => {
   const [formData, setFormData] = useState({
@@ -12,44 +14,65 @@ const DonationForm = ({ onSubmit, donorData }) => {
     pickupDate: "",
     pickupTime: "",
     specialInstructions: "",
-    contactPerson: donorData.name,
-    contactPhone: donorData.phone,
-    pickupAddress: donorData.address,
+    contactPerson: donorData?.name || donorData?.companyName || "",
+    contactPhone: donorData?.phone || "",
+    pickupAddress: donorData?.address || "",
+    forFarmers: false, // Add the forFarmers field
   });
 
   const [images, setImages] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState({ type: '', message: '' });
   const [dragActive, setDragActive] = useState(false);
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({
       ...prev,
-      [name]: value,
+      [name]: type === 'checkbox' ? checked : value
     }));
+  };
+
+  const processFiles = (files) => {
+    const maxSize = 5 * 1024 * 1024; // 5MB per file
+    const validTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+    
+    files.forEach((file) => {
+      if (!validTypes.includes(file.type)) {
+        setSubmitStatus({
+          type: 'error',
+          message: `${file.name} is not a valid image format. Please use JPG or PNG.`
+        });
+        return;
+      }
+      
+      if (file.size > maxSize) {
+        setSubmitStatus({
+          type: 'error',
+          message: `${file.name} is too large. Maximum size is 5MB.`
+        });
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setImages((prev) => [
+          ...prev,
+          {
+            id: Date.now() + Math.random(),
+            url: e.target.result,
+            name: file.name,
+            file: file // Store the actual file for upload
+          },
+        ]);
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
   const handleImageUpload = (e) => {
     const files = Array.from(e.target.files);
     processFiles(files);
-  };
-
-  const processFiles = (files) => {
-    files.forEach((file) => {
-      if (file.type.startsWith("image/")) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          setImages((prev) => [
-            ...prev,
-            {
-              id: Date.now() + Math.random(),
-              url: e.target.result,
-              name: file.name,
-            },
-          ]);
-        };
-        reader.readAsDataURL(file);
-      }
-    });
   };
 
   const handleDrag = (e) => {
@@ -75,33 +98,108 @@ const DonationForm = ({ onSubmit, donorData }) => {
     setImages((prev) => prev.filter((img) => img.id !== id));
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const donation = {
-      ...formData,
-      images: images,
-      submittedAt: new Date().toISOString(),
-      scheduledTime: `${formData.pickupDate} ${formData.pickupTime}`,
-      location: formData.pickupAddress,
-    };
-    onSubmit(donation);
-
-    // Reset form
-    setFormData({
-      foodType: "",
-      category: "",
-      quantity: "",
-      unit: "units",
-      description: "",
-      expiryDate: "",
-      pickupDate: "",
-      pickupTime: "",
-      specialInstructions: "",
-      contactPerson: donorData.name,
-      contactPhone: donorData.phone,
-      pickupAddress: donorData.address,
+  // Convert image to base64
+  const convertToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result.split(',')[1]); // Remove data:image/jpeg;base64, prefix
+      reader.onerror = error => reject(error);
     });
-    setImages([]);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setSubmitStatus({ type: '', message: '' });
+
+    try {
+      // Initialize Cloud Functions
+      const createDonationListing = httpsCallable(functions, 'createDonationListing');
+      const uploadDonationImage = httpsCallable(functions, 'uploadDonationImage');
+      const geocodeAddress = httpsCallable(functions, 'geocodeAddress');
+
+      // Get coordinates for the address
+      let coordinates = null;
+      try {
+        const geoResult = await geocodeAddress({ address: formData.pickupAddress });
+        coordinates = geoResult.data.coordinates;
+      } catch (geoError) {
+        console.warn("Could not geocode address, proceeding without coordinates");
+      }
+
+      // Create the donation listing
+      const listingResult = await createDonationListing({
+        ...formData,
+        donorData,
+        coordinates
+      });
+
+      if (!listingResult.data.success) {
+        throw new Error(listingResult.data.message || 'Failed to create listing');
+      }
+
+      const listingID = listingResult.data.listingID;
+
+      // Upload images if any
+      if (images.length > 0) {
+        for (let i = 0; i < images.length; i++) {
+          const image = images[i];
+          try {
+            const base64Data = await convertToBase64(image.file);
+            await uploadDonationImage({
+              listingID,
+              imageData: base64Data,
+              fileName: `image_${i + 1}_${image.name}`,
+              contentType: image.file.type
+            });
+          } catch (uploadError) {
+            console.error(`Error uploading ${image.name}:`, uploadError);
+            // Continue with other images even if one fails
+          }
+        }
+      }
+
+      // Success - call parent callback
+      onSubmit({
+        ...formData,
+        listingID,
+        submittedAt: new Date().toISOString(),
+      });
+
+      // Show success message
+      setSubmitStatus({
+        type: 'success',
+        message: 'Donation submitted successfully! It will appear in available listings shortly.'
+      });
+
+      // Reset form
+      setFormData({
+        foodType: "",
+        category: "",
+        quantity: "",
+        unit: "units",
+        description: "",
+        expiryDate: "",
+        pickupDate: "",
+        pickupTime: "",
+        specialInstructions: "",
+        contactPerson: donorData?.name || donorData?.companyName || "",
+        contactPhone: donorData?.phone || "",
+        pickupAddress: donorData?.address || "",
+        forFarmers: false,
+      });
+      setImages([]);
+
+    } catch (error) {
+      console.error("Error submitting donation:", error);
+      setSubmitStatus({
+        type: 'error',
+        message: error.message || 'Failed to submit donation. Please try again.'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Get today's date for min date validation
@@ -113,6 +211,20 @@ const DonationForm = ({ onSubmit, donorData }) => {
         <h2>Donate Food</h2>
         <p>Help us redistribute your surplus food to those in need</p>
       </div>
+
+      {/* Status Messages */}
+      {submitStatus.message && (
+        <div className={`status-message ${submitStatus.type}`} style={{
+          padding: '1rem',
+          marginBottom: '1rem',
+          borderRadius: '8px',
+          backgroundColor: submitStatus.type === 'success' ? '#d4edda' : '#f8d7da',
+          color: submitStatus.type === 'success' ? '#155724' : '#721c24',
+          border: `1px solid ${submitStatus.type === 'success' ? '#c3e6cb' : '#f5c6cb'}`
+        }}>
+          {submitStatus.message}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="donation-form">
         {/* Food Details */}
@@ -142,13 +254,14 @@ const DonationForm = ({ onSubmit, donorData }) => {
                 required
               >
                 <option value="">Select Category</option>
-                <option value="fresh-meals">Fresh Meals</option>
-                <option value="bakery">Bakery Items</option>
-                <option value="fruits-vegetables">Fruits & Vegetables</option>
-                <option value="dairy">Dairy Products</option>
-                <option value="packaged-goods">Packaged Goods</option>
-                <option value="beverages">Beverages</option>
-                <option value="other">Other</option>
+                <option value="Fresh Meals">Fresh Meals</option>
+                <option value="Cooked Meals">Cooked Meals</option>
+                <option value="Baked Goods">Baked Goods</option>
+                <option value="Dairy Products">Dairy Products</option>
+                <option value="Fruits & Vegetables">Fruits & Vegetables</option>
+                <option value="Packaged Foods">Packaged Foods</option>
+                <option value="Beverages">Beverages</option>
+                <option value="Other">Other</option>
               </select>
             </div>
 
@@ -166,35 +279,45 @@ const DonationForm = ({ onSubmit, donorData }) => {
             </div>
 
             <div className="form-group">
-              <label htmlFor="unit">Unit</label>
+              <label htmlFor="unit">Unit *</label>
               <select
                 id="unit"
                 name="unit"
                 value={formData.unit}
                 onChange={handleInputChange}
+                required
               >
                 <option value="units">Units</option>
                 <option value="kg">Kilograms</option>
                 <option value="portions">Portions</option>
+                <option value="servings">Servings</option>
                 <option value="boxes">Boxes</option>
-                <option value="trays">Trays</option>
+                <option value="bags">Bags</option>
+                <option value="liters">Liters</option>
               </select>
             </div>
 
             <div className="form-group full-width">
-              <label htmlFor="description">Description</label>
+              <label htmlFor="description">Description *</label>
               <textarea
                 id="description"
                 name="description"
                 value={formData.description}
                 onChange={handleInputChange}
-                placeholder="Describe the food condition, ingredients, preparation method, etc."
+                placeholder="Describe the food items, condition, ingredients, etc."
                 rows="3"
+                required
               />
             </div>
+          </div>
+        </div>
 
+        {/* Expiry & Pickup */}
+        <div className="form-section">
+          <h3>Expiry & Pickup Details</h3>
+          <div className="form-grid">
             <div className="form-group">
-              <label htmlFor="expiryDate">Best Before Date *</label>
+              <label htmlFor="expiryDate">Expiry Date</label>
               <input
                 type="date"
                 id="expiryDate"
@@ -202,61 +325,11 @@ const DonationForm = ({ onSubmit, donorData }) => {
                 value={formData.expiryDate}
                 onChange={handleInputChange}
                 min={today}
-                required
               />
             </div>
-          </div>
-        </div>
 
-        {/* Food Images */}
-        <div className="form-section">
-          <h3>Food Images</h3>
-          <div
-            className={`image-upload-area ${dragActive ? "drag-active" : ""}`}
-            onDragEnter={handleDrag}
-            onDragLeave={handleDrag}
-            onDragOver={handleDrag}
-            onDrop={handleDrop}
-          >
-            <input
-              type="file"
-              id="images"
-              multiple
-              accept="image/*"
-              onChange={handleImageUpload}
-              style={{ display: "none" }}
-            />
-            <label htmlFor="images" className="upload-label">
-              <div className="upload-icon">📷</div>
-              <p>Click to upload or drag and drop images</p>
-              <small>PNG, JPG, JPEG up to 5MB each</small>
-            </label>
-          </div>
-
-          {images.length > 0 && (
-            <div className="image-preview-grid">
-              {images.map((image) => (
-                <div key={image.id} className="image-preview">
-                  <img src={image.url} alt={image.name} />
-                  <button
-                    type="button"
-                    className="remove-image"
-                    onClick={() => removeImage(image.id)}
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Pickup Schedule */}
-        <div className="form-section">
-          <h3>Pickup Schedule</h3>
-          <div className="form-grid">
             <div className="form-group">
-              <label htmlFor="pickupDate">Pickup Date *</label>
+              <label htmlFor="pickupDate">Preferred Pickup Date *</label>
               <input
                 type="date"
                 id="pickupDate"
@@ -269,35 +342,136 @@ const DonationForm = ({ onSubmit, donorData }) => {
             </div>
 
             <div className="form-group">
-              <label htmlFor="pickupTime">Preferred Time *</label>
-              <select
+              <label htmlFor="pickupTime">Preferred Pickup Time *</label>
+              <input
+                type="time"
                 id="pickupTime"
                 name="pickupTime"
                 value={formData.pickupTime}
                 onChange={handleInputChange}
                 required
-              >
-                <option value="">Select Time</option>
-                <option value="08:00">8:00 AM</option>
-                <option value="09:00">9:00 AM</option>
-                <option value="10:00">10:00 AM</option>
-                <option value="11:00">11:00 AM</option>
-                <option value="12:00">12:00 PM</option>
-                <option value="13:00">1:00 PM</option>
-                <option value="14:00">2:00 PM</option>
-                <option value="15:00">3:00 PM</option>
-                <option value="16:00">4:00 PM</option>
-                <option value="17:00">5:00 PM</option>
-                <option value="18:00">6:00 PM</option>
-                <option value="19:00">7:00 PM</option>
-              </select>
+              />
+            </div>
+
+            {/* forFarmers checkbox */}
+            <div className="form-group">
+              <label className="checkbox-label" style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '0.5rem',
+                cursor: 'pointer'
+              }}>
+                <input
+                  type="checkbox"
+                  name="forFarmers"
+                  checked={formData.forFarmers}
+                  onChange={handleInputChange}
+                  style={{ marginRight: '0.5rem' }}
+                />
+                Available for Farmers/Animal Feed
+              </label>
+              <small style={{ color: '#666', marginTop: '0.25rem', display: 'block' }}>
+                Check this if the food can be used for animal consumption
+              </small>
             </div>
           </div>
         </div>
 
-        {/* Contact & Location */}
+        {/* Images */}
         <div className="form-section">
-          <h3>Contact & Location Details</h3>
+          <h3>Food Images (Optional)</h3>
+          <div 
+            className={`image-upload-area ${dragActive ? 'drag-active' : ''}`}
+            onDragEnter={handleDrag}
+            onDragLeave={handleDrag}
+            onDragOver={handleDrag}
+            onDrop={handleDrop}
+            style={{
+              border: '2px dashed #ccc',
+              borderRadius: '8px',
+              padding: '2rem',
+              textAlign: 'center',
+              cursor: 'pointer',
+              backgroundColor: dragActive ? '#f0f8ff' : '#fafafa'
+            }}
+          >
+            <input
+              type="file"
+              id="images"
+              name="images"
+              accept="image/jpeg,image/jpg,image/png"
+              multiple
+              onChange={handleImageUpload}
+              style={{ display: 'none' }}
+            />
+            <label htmlFor="images" style={{ cursor: 'pointer' }}>
+              <div>📸 Click to upload images or drag and drop</div>
+              <small style={{ color: '#666', marginTop: '0.5rem', display: 'block' }}>
+                JPG, PNG (max 5MB each)
+              </small>
+            </label>
+          </div>
+
+          {/* Image Preview */}
+          {images.length > 0 && (
+            <div className="image-preview" style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+              gap: '1rem',
+              marginTop: '1rem'
+            }}>
+              {images.map((image) => (
+                <div key={image.id} style={{ position: 'relative' }}>
+                  <img
+                    src={image.url}
+                    alt="Food preview"
+                    style={{
+                      width: '100%',
+                      height: '150px',
+                      objectFit: 'cover',
+                      borderRadius: '8px'
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeImage(image.id)}
+                    style={{
+                      position: 'absolute',
+                      top: '5px',
+                      right: '5px',
+                      background: 'rgba(255, 0, 0, 0.7)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: '24px',
+                      height: '24px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    ✕
+                  </button>
+                  <div style={{
+                    fontSize: '0.8rem',
+                    padding: '0.25rem',
+                    backgroundColor: 'rgba(0,0,0,0.7)',
+                    color: 'white',
+                    position: 'absolute',
+                    bottom: '0',
+                    left: '0',
+                    right: '0',
+                    borderRadius: '0 0 8px 8px'
+                  }}>
+                    {image.name}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Contact Information */}
+        <div className="form-section">
+          <h3>Contact Information</h3>
           <div className="form-grid">
             <div className="form-group">
               <label htmlFor="contactPerson">Contact Person *</label>
@@ -350,8 +524,16 @@ const DonationForm = ({ onSubmit, donorData }) => {
         </div>
 
         <div className="form-actions">
-          <button type="submit" className="submit-btn">
-            Submit Donation
+          <button 
+            type="submit" 
+            className="submit-btn"
+            disabled={isSubmitting}
+            style={{
+              opacity: isSubmitting ? 0.7 : 1,
+              cursor: isSubmitting ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {isSubmitting ? "Submitting..." : "Submit Donation"}
           </button>
         </div>
       </form>
