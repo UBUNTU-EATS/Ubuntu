@@ -520,21 +520,21 @@ const UnifiedSignup = ({ onAlreadyHaveAccountClick }) => {
         </button>
       </form>
 
-      <section className="have-account">
-        <p>
-          Already have an account?{" "}
-          <a
-            href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              onAlreadyHaveAccountClick();
-            }}
-            className="to-login"
-          >
-            Login
-          </a>
-        </p>
-      </section>
+<section className="have-account">
+  <p>
+    Already have an account?{" "}
+    <a
+      href="#"
+      onClick={(e) => {
+        e.preventDefault();
+        onAlreadyHaveAccountClick(); // triggers parent to switch form
+      }}
+      className="to-login"
+    >
+      Login
+    </a>
+  </p>
+</section>
     </section>
   );
 };

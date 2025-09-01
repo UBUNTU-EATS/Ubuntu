@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
 import RouteMap from './RouteMap'; // Import the RouteMap component
-let fetchIssues;
-let UpdateIssue; 
+// let fetchIssues;
+// let UpdateIssue; 
 import '../styles/IssuePage.css';
-let fetchUser
+// let fetchUser
 import { FaBars } from 'react-icons/fa';
 import { toast } from "react-toastify";
 import { useNavigate ,Navigate} from "react-router-dom";

@@ -1,30 +1,23 @@
 import React, { useState } from "react";
-import Login from "./login";
+import Login from "./Login";
 import UnifiedSignup from "./UnifiedSignup";
 import "../styles/Auth.css";
 
 const AuthContainer = () => {
-  const [showLogin, setShowLogin] = useState(true);
-  const [showSignup, setShowSignup] = useState(false);
+  const [activeForm, setActiveForm] = useState("login");
 
-  const handleCreateAccountClick = () => {
-    setShowSignup(true);
-    setShowLogin(false);
-  };
-
-  const handleAlreadyHaveAccountClick = () => {
-    setShowSignup(false);
-    setShowLogin(true);
-  };
+  const handleShowSignup = () => setActiveForm("signup");
+  const handleShowLogin = () => setActiveForm("login");
 
   return (
     <div className="authentication-page">
       <main className="auth-container">
-        {showLogin && <Login onCreateAccountClick={handleCreateAccountClick} />}
-        {showSignup && (
-          <UnifiedSignup
-            onAlreadyHaveAccountClick={handleAlreadyHaveAccountClick}
-          />
+        {activeForm === "login" && (
+          <Login onNoAccountClick={handleShowSignup} />
+        )}
+
+        {activeForm === "signup" && (
+          <UnifiedSignup onAlreadyHaveAccountClick={handleShowLogin} />
         )}
       </main>
     </div>

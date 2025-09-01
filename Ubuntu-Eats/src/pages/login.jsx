@@ -5,12 +5,13 @@ import { auth, db } from "../../firebaseConfig";
 import { doc, getDoc } from "firebase/firestore";
 import "../styles/login.css";
 
-const Login = ({ onNoAccountClick }) => {
+const Login = ({ isActive, onNoAccountClick }) => {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -21,7 +22,6 @@ const Login = ({ onNoAccountClick }) => {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // Fetch user data from Firestore
       const userRef = doc(db, "users", email);
       const userSnap = await getDoc(userRef);
 
@@ -29,7 +29,6 @@ const Login = ({ onNoAccountClick }) => {
         const userData = userSnap.data();
         const role = userData.role;
 
-        // Navigate based on role
         if (role === "individual" || role === "company" || role === "farmer") {
           navigate("/donor-dashboard");
         } else if (role === "volunteer") {
@@ -77,18 +76,20 @@ const Login = ({ onNoAccountClick }) => {
         </button>
       </form>
 
-      <p className="no-account">
-        Don’t have an account?{" "}
-        <a
-          href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            if (onNoAccountClick) onNoAccountClick();
-          }}
-        >
-          Sign Up
-        </a>
-      </p>
+      
+<p className="no-account">
+  Don’t have an account?{" "}
+  <a
+    href="#"
+    onClick={(e) => {
+      e.preventDefault();
+      onNoAccountClick(); // triggers parent to switch form
+    }}
+  >
+    Sign Up
+  </a>
+</p>
+
     </section>
   );
 };

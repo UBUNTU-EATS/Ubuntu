@@ -6,6 +6,11 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 
 import "./App.css";
 import LandingPage from "./pages/LandingPage";
+import VolunteerDashboard from "./pages/VolunteerDashboard";
+import VolunteerProfile from "./pages/VolunteerProfile";
+import UnifiedSignup from "./pages/UnifiedSignup";
+import MyDeliveries from "./pages/MyDeliveries";
+import AvailableDeliveries from "./pages/AvailableDeliveries";
 
 import DonorDashboard from "./pages/DonorDashboard";
 
