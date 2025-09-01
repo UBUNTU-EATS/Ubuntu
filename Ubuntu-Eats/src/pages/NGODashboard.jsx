@@ -1,4 +1,16 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  doc,
+  updateDoc,
+  addDoc,
+  serverTimestamp,
+  getDoc,
+} from "firebase/firestore";
+import { db, auth } from "../../firebaseConfig";
 import NGOProfile from "./NGOProfile";
 import AvailableDonations from "./AvailableDonations";
 import ClaimedDonations from "./ClaimedDonations";
@@ -6,135 +18,211 @@ import "../styles/NGODashboard.css";
 
 const NGODashboard = () => {
   const [activeTab, setActiveTab] = useState("available");
-  const [ngoData, setNgoData] = useState({
-    name: "Hope Community Center",
-    email: "contact@hopecommunity.org",
-    phone: "+27 11 987 6543",
-    address: "456 Oak Ave, Johannesburg, Gauteng",
-    registrationNumber: "NPO-123-456",
-    beneficiaries: "250 families weekly",
-  });
+  const [ngoData, setNgoData] = useState(null);
+  const [availableDonations, setAvailableDonations] = useState([]);
+  const [claimedDonations, setClaimedDonations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [userEmail, setUserEmail] = useState("");
 
-  // Mock data for available donations
-  const [availableDonations, setAvailableDonations] = useState([
-    {
-      id: 1,
-      donorName: "Green Valley Restaurant",
-      foodType: "Fresh Sandwiches",
-      quantity: "20 units",
-      category: "fresh-meals",
-      expiryDate: "2025-08-31",
-      pickupTime: "2025-08-31 14:00",
-      location: "123 Main St, Johannesburg",
-      distance: "2.3 km",
-      specialInstructions: "Ask for manager at back entrance",
-      status: "available",
-    },
-    {
-      id: 2,
-      donorName: "Sunshine Bakery",
-      foodType: "Assorted Pastries",
-      quantity: "15 kg",
-      category: "bakery",
-      expiryDate: "2025-09-01",
-      pickupTime: "2025-08-31 16:00",
-      location: "789 Bread St, Johannesburg",
-      distance: "4.1 km",
-      specialInstructions: "Pick up from side door after 4 PM",
-      status: "available",
-    },
-    {
-      id: 3,
-      donorName: "Fresh Market",
-      foodType: "Mixed Vegetables",
-      quantity: "30 kg",
-      category: "fruits-vegetables",
-      expiryDate: "2025-09-02",
-      pickupTime: "2025-09-01 10:00",
-      location: "321 Produce Ave, Johannesburg",
-      distance: "5.7 km",
-      specialInstructions: "Available in crates near loading bay",
-      status: "available",
-    },
-  ]);
+  // Fetch NGO data and donations
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
 
-  // Mock data for claimed donations
-  const [claimedDonations, setClaimedDonations] = useState([
-    {
-      id: 101,
-      donorName: "City Cafe",
-      foodType: "Prepared Meals",
-      quantity: "25 portions",
-      category: "fresh-meals",
-      expiryDate: "2025-08-30",
-      pickupTime: "2025-08-30 15:00",
-      location: "555 Urban St, Johannesburg",
-      distance: "3.2 km",
-      specialInstructions: "Ring bell twice for kitchen",
-      status: "claimed",
-      claimDate: "2025-08-30 10:30",
-      collectionMethod: "self", // or "volunteer"
-      volunteerAssigned: null,
-    },
-  ]);
+    setUserEmail(user.email);
 
-  const claimDonation = (donationId) => {
-    const donation = availableDonations.find((d) => d.id === donationId);
-    if (donation) {
-      // Remove from available
-      setAvailableDonations((prev) => prev.filter((d) => d.id !== donationId));
+    // Fetch NGO profile data
+    const fetchNGOData = async () => {
+      try {
+        const userDocRef = doc(db, "users", user.email);
+        const userDoc = await getDoc(userDocRef);
+        if (userDoc.exists()) {
+          setNgoData(userDoc.data());
+        } else {
+          console.error("NGO data not found for email:", user.email);
+        }
+      } catch (error) {
+        console.error("Error fetching NGO data:", error);
+      }
+    };
 
-      // Add to claimed with additional info
-      const claimedDonation = {
-        ...donation,
-        status: "claimed",
-        claimDate: new Date().toISOString(),
-        collectionMethod: "pending", // To be set by NGO
+    // Fetch available donations (UNCLAIMED status)
+    const availableQuery = query(
+      collection(db, "foodListings"),
+      where("listingStatus", "==", "UNCLAIMED")
+    );
+
+    const availableUnsubscribe = onSnapshot(availableQuery, (snapshot) => {
+      const donations = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setAvailableDonations(donations);
+    });
+
+    // Fetch claimed donations by this NGO
+    const claimedQuery = query(
+      collection(db, "claims"),
+      where("ngoEmail", "==", user.email)
+    );
+
+    const claimedUnsubscribe = onSnapshot(claimedQuery, async (snapshot) => {
+      const claims = snapshot.docs.map((doc) => ({
+        claimId: doc.id,
+        ...doc.data(),
+      }));
+
+      // Get the actual donation data for each claim
+      const claimedDonationsData = await Promise.all(
+        claims.map(async (claim) => {
+          try {
+            const donationDoc = await getDoc(
+              doc(db, "foodListings", claim.listingId)
+            );
+            if (donationDoc.exists()) {
+              return {
+                ...claim,
+                ...donationDoc.data(),
+                claimId: claim.claimId,
+              };
+            }
+            return claim;
+          } catch (error) {
+            console.error("Error fetching donation data:", error);
+            return claim;
+          }
+        })
+      );
+
+      setClaimedDonations(claimedDonationsData);
+      setLoading(false);
+    });
+
+    fetchNGOData();
+
+    // Cleanup subscriptions
+    return () => {
+      availableUnsubscribe();
+      claimedUnsubscribe();
+    };
+  }, []);
+
+  const claimDonation = async (donationId) => {
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error("User not authenticated");
+
+      const donationRef = doc(db, "foodListings", donationId);
+      const donationDoc = await getDoc(donationRef);
+
+      if (!donationDoc.exists()) {
+        throw new Error("Donation not found");
+      }
+
+      const donationData = donationDoc.data();
+
+      // Get NGO name from ngoData or use a fallback
+      let ngoName = "Unknown NGO";
+      if (ngoData) {
+        ngoName =
+          ngoData.name ||
+          ngoData.contactPerson ||
+          ngoData.companyName ||
+          "Unknown NGO";
+      }
+
+      // Create claim record
+      const claimData = {
+        listingId: donationId,
+        ngoId: user.uid,
+        ngoEmail: user.email,
+        ngoName: ngoName,
+        claimDate: serverTimestamp(),
+        status: "CLAIMED",
+        collectionMethod: "pending",
         volunteerAssigned: null,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       };
 
-      setClaimedDonations((prev) => [...prev, claimedDonation]);
+      await addDoc(collection(db, "claims"), claimData);
+
+      // Update donation status
+      await updateDoc(donationRef, {
+        listingStatus: "CLAIMED",
+        claimedBy: user.uid,
+        claimedByEmail: user.email,
+        claimedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error("Error claiming donation:", error);
+      throw error;
     }
   };
 
-  const setCollectionMethod = (donationId, method) => {
-    setClaimedDonations((prev) =>
-      prev.map((donation) =>
-        donation.id === donationId
-          ? { ...donation, collectionMethod: method }
-          : donation
-      )
-    );
-  };
-
-  const confirmCollection = (donationId) => {
-    setClaimedDonations((prev) =>
-      prev.map((donation) =>
-        donation.id === donationId
-          ? { ...donation, status: "collected" }
-          : donation
-      )
-    );
-  };
-
-  const cancelClaim = (donationId) => {
-    const donation = claimedDonations.find((d) => d.id === donationId);
-    if (donation) {
-      // Remove from claimed
-      setClaimedDonations((prev) => prev.filter((d) => d.id !== donationId));
-
-      // Add back to available
-      const availableDonation = {
-        ...donation,
-        status: "available",
-        claimDate: undefined,
-        collectionMethod: undefined,
-        volunteerAssigned: undefined,
-      };
-
-      setAvailableDonations((prev) => [...prev, availableDonation]);
+  const setCollectionMethod = async (claimId, method) => {
+    try {
+      const claimRef = doc(db, "claims", claimId);
+      await updateDoc(claimRef, {
+        collectionMethod: method,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error("Error setting collection method:", error);
+      throw error;
     }
   };
+
+  const confirmCollection = async (claimId, listingId) => {
+    try {
+      const claimRef = doc(db, "claims", claimId);
+      const listingRef = doc(db, "foodListings", listingId);
+
+      await updateDoc(claimRef, {
+        status: "COLLECTED",
+        collectedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      await updateDoc(listingRef, {
+        listingStatus: "COLLECTED",
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error("Error confirming collection:", error);
+      throw error;
+    }
+  };
+
+  const cancelClaim = async (claimId, listingId) => {
+    try {
+      const claimRef = doc(db, "claims", claimId);
+      const listingRef = doc(db, "foodListings", listingId);
+
+      // Update claim status instead of deleting
+      await updateDoc(claimRef, {
+        status: "CANCELLED",
+        updatedAt: serverTimestamp(),
+      });
+
+      // Reset donation status
+      await updateDoc(listingRef, {
+        listingStatus: "UNCLAIMED",
+        claimedBy: null,
+        claimedByEmail: null,
+        claimedAt: null,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error("Error canceling claim:", error);
+      throw error;
+    }
+  };
+
+  if (loading) {
+    return <div className="loading">Loading...</div>;
+  }
 
   return (
     <div className="ngo-dashboard">
@@ -142,7 +230,9 @@ const NGODashboard = () => {
       <header className="dashboard-header">
         <div className="header-content">
           <h1 className="dashboard-title">NGO Dashboard</h1>
-          <p className="welcome-text">Welcome, {ngoData.name}!</p>
+          <p className="welcome-text">
+            Welcome, {ngoData?.name || ngoData?.contactPerson || userEmail}!
+          </p>
         </div>
         <div className="header-stats">
           <div className="stat-card">
@@ -154,8 +244,10 @@ const NGODashboard = () => {
             <span className="stat-label">Claimed Donations</span>
           </div>
           <div className="stat-card">
-            <span className="stat-number">1,250</span>
-            <span className="stat-label">Meals Provided</span>
+            <span className="stat-number">
+              {claimedDonations.filter((d) => d.status === "COLLECTED").length}
+            </span>
+            <span className="stat-label">Successful Collections</span>
           </div>
         </div>
       </header>
@@ -184,7 +276,7 @@ const NGODashboard = () => {
 
       {/* Tab Content */}
       <main className="dashboard-content">
-        {activeTab === "profile" && (
+        {activeTab === "profile" && ngoData && (
           <NGOProfile ngoData={ngoData} setNgoData={setNgoData} />
         )}
 
