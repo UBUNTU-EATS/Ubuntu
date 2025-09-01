@@ -10,18 +10,21 @@ const ActiveDonations = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [updating, setUpdating] = useState(null);
   const [viewMode, setViewMode] = useState("grid"); // grid or list
-  const [chatModal, setChatModal] = useState({ open: false, donation: null });
   const [chatMessages, setChatMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
+  const [chatModal, setChatModal] = useState({ open: false, donation: null });
+  const [claimerData, setClaimerData] = useState(null);
+  const [loadingClaimer, setLoadingClaimer] = useState(false);
 
   // Firebase Functions base URL
-  const FUNCTIONS_BASE_URL = "https://us-central1-ubuntu-eats.cloudfunctions.net";
+  const FUNCTIONS_BASE_URL =
+    "https://us-central1-ubuntu-eats.cloudfunctions.net";
 
   // Helper function to get auth token
   const getAuthToken = async () => {
     const user = auth.currentUser;
     if (!user) {
-      throw new Error('User not authenticated');
+      throw new Error("User not authenticated");
     }
     return await user.getIdToken();
   };
@@ -29,22 +32,57 @@ const ActiveDonations = () => {
   // Helper function to make authenticated HTTP requests
   const makeAuthenticatedRequest = async (endpoint, data = null) => {
     const token = await getAuthToken();
-    
+
     const response = await fetch(`${FUNCTIONS_BASE_URL}/${endpoint}`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify(data)
+      body: JSON.stringify(data),
     });
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      throw new Error(
+        errorData.message || `HTTP error! status: ${response.status}`
+      );
     }
 
     return await response.json();
+  };
+
+  // Fetch claimer user data
+  const fetchClaimerData = async (claimedByEmail, claimedBy) => {
+    try {
+      setLoadingClaimer(true);
+      const result = await makeAuthenticatedRequest("getUserData", {
+        userEmail: claimedByEmail,
+        userId: claimedBy,
+      });
+
+      if (result.success) {
+        setClaimerData(result.user);
+      }
+    } catch (error) {
+      console.error("Error fetching claimer data:", error);
+    } finally {
+      setLoadingClaimer(false);
+    }
+  };
+
+  // Open chat modal
+  const openChatModal = (donation) => {
+    setChatModal({ open: true, donation });
+    if (donation.claimedByEmail || donation.claimedBy) {
+      fetchClaimerData(donation.claimedByEmail, donation.claimedBy);
+    }
+  };
+
+  // Close chat modal
+  const closeChatModal = () => {
+    setChatModal({ open: false, donation: null });
+    setClaimerData(null);
   };
 
   // Fetch donor's donations
@@ -53,12 +91,12 @@ const ActiveDonations = () => {
       setLoading(true);
       setError(null);
 
-      const result = await makeAuthenticatedRequest('getDonorDonations', {
-        limit: 100
+      const result = await makeAuthenticatedRequest("getDonorDonations", {
+        limit: 100,
       });
 
       if (result.success) {
-        const transformedDonations = result.donations.map(donation => ({
+        const transformedDonations = result.donations.map((donation) => ({
           id: donation.id,
           listingID: donation.listingID,
           foodType: donation.foodType,
@@ -76,15 +114,18 @@ const ActiveDonations = () => {
           forFarmers: donation.forFarmers,
           imageURL: donation.imageURL,
           donorEmail: donation.donorEmail,
-          coordinates: donation.coordinates
+          coordinates: donation.coordinates,
+          claimedAt: donation.claimedAt,
+          claimedBy: donation.claimedBy,
+          claimedByEmail: donation.claimedByEmail,
         }));
 
         setDonations(transformedDonations);
       } else {
-        throw new Error(result.message || 'Failed to fetch donations');
+        throw new Error(result.message || "Failed to fetch donations");
       }
     } catch (error) {
-      console.error('Error fetching my donations:', error);
+      console.error("Error fetching my donations:", error);
       setError(error.message);
     } finally {
       setLoading(false);
@@ -94,101 +135,24 @@ const ActiveDonations = () => {
   // Map database status to display status
   const mapDatabaseStatusToDisplay = (dbStatus) => {
     const statusMap = {
-      'UNCLAIMED': 'Available',
-      'PENDING_PICKUP': 'Available', 
-      'IN_TRANSIT': 'Collected',
-      'COMPLETED': 'Completed',
-      'CANCELLED': 'Cancelled'
+      UNCLAIMED: "Available",
+      PENDING_PICKUP: "Available",
+      CLAIMED: "Claimed",
+      IN_TRANSIT: "Collected",
+      COMPLETED: "Completed",
+      CANCELLED: "Cancelled",
     };
     return statusMap[dbStatus] || dbStatus;
-  };
-
-  // Check if donation has been claimed (collected status)
-  const isDonationClaimed = (donation) => {
-    return donation.status === 'Collected' || donation.status === 'Completed';
-  };
-
-  // Open chat modal
-  const openChatModal = (donation) => {
-    setChatModal({ open: true, donation });
-    // Load existing messages for this donation (you can implement this later)
-    loadChatMessages(donation.listingID);
-  };
-
-  // Close chat modal
-  const closeChatModal = () => {
-    setChatModal({ open: false, donation: null });
-    setChatMessages([]);
-    setNewMessage("");
-  };
-
-  // Load chat messages (placeholder - implement with your backend)
-  const loadChatMessages = (listingID) => {
-    // Mock messages for demo - replace with actual API call
-    const mockMessages = [
-      {
-        id: 1,
-        sender: 'recipient',
-        senderName: 'Hope Community Center',
-        message: 'Thank you for the donation! When can we arrange pickup?',
-        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-        avatar: '🏢'
-      },
-      {
-        id: 2,
-        sender: 'donor',
-        senderName: 'You',
-        message: 'You\'re welcome! Pickup is available anytime between 2-6 PM today.',
-        timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
-        avatar: '👤'
-      }
-    ];
-    setChatMessages(mockMessages);
-  };
-
-  // Send message (placeholder - implement with your backend)
-  const sendMessage = () => {
-    if (!newMessage.trim()) return;
-
-    const message = {
-      id: Date.now(),
-      sender: 'donor',
-      senderName: 'You',
-      message: newMessage.trim(),
-      timestamp: new Date().toISOString(),
-      avatar: '👤'
-    };
-
-    setChatMessages(prev => [...prev, message]);
-    setNewMessage("");
-
-    // TODO: Send message to backend/Firebase
-    // sendMessageToBackend(chatModal.donation.listingID, message);
-  };
-
-  // Handle enter key in chat
-  const handleChatKeyPress = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  };
-
-  // Format chat timestamp
-  const formatChatTime = (timestamp) => {
-    return new Date(timestamp).toLocaleTimeString('en-ZA', {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
   };
 
   // Map display status to database status
   const mapDisplayStatusToDatabase = (displayStatus) => {
     const statusMap = {
-      'Available': 'UNCLAIMED',
-      'Collected': 'IN_TRANSIT',
-      'Completed': 'COMPLETED',
-      'Cancelled': 'CANCELLED'
+      Available: "UNCLAIMED",
+      Claimed: "CLAIMED",
+      Collected: "IN_TRANSIT",
+      Completed: "COMPLETED",
+      Cancelled: "CANCELLED",
     };
     return statusMap[displayStatus] || displayStatus;
   };
@@ -197,27 +161,27 @@ const ActiveDonations = () => {
   const updateStatus = async (donationId, newStatus) => {
     try {
       setUpdating(donationId);
-      
+
       const dbStatus = mapDisplayStatusToDatabase(newStatus);
-      
-      const result = await makeAuthenticatedRequest('updateDonationStatus', {
+
+      const result = await makeAuthenticatedRequest("updateDonationStatus", {
         listingID: donationId,
-        status: dbStatus
+        status: dbStatus,
       });
 
       if (result.success) {
-        setDonations(prev => 
-          prev.map(donation => 
+        setDonations((prev) =>
+          prev.map((donation) =>
             donation.id === donationId || donation.listingID === donationId
               ? { ...donation, status: newStatus }
               : donation
           )
         );
       } else {
-        throw new Error(result.message || 'Failed to update status');
+        throw new Error(result.message || "Failed to update status");
       }
     } catch (error) {
-      console.error('Error updating status:', error);
+      console.error("Error updating status:", error);
       alert(`Failed to update status: ${error.message}`);
     } finally {
       setUpdating(null);
@@ -225,41 +189,46 @@ const ActiveDonations = () => {
   };
 
   // Filter donations
-  const filteredDonations = donations.filter(donation => {
+  const filteredDonations = donations.filter((donation) => {
     if (statusFilter === "all") return true;
-    if (statusFilter === "active") return ["Available"].includes(donation.status);
-    if (statusFilter === "completed") return ["Completed", "Collected"].includes(donation.status);
-    if (statusFilter === "cancelled") return ["Cancelled"].includes(donation.status);
-    return donation.status.toLowerCase() === statusFilter.toLowerCase();
+    if (statusFilter === "active") return donation.status === "Available";
+    if (statusFilter === "claimed") return donation.status === "Claimed";
+    return false;
   });
 
   // Get status configuration
   const getStatusConfig = (status) => {
     const configs = {
-      "Available": { 
-        color: "#10b981", 
-        bg: "#d1fae5", 
-        icon: "🟢", 
-        pulse: true 
+      Available: {
+        color: "#10b981",
+        bg: "#d1fae5",
+        icon: "🟢",
+        pulse: true,
       },
-      "Collected": { 
-        color: "#3b82f6", 
-        bg: "#dbeafe", 
-        icon: "📦", 
-        pulse: false 
+      Claimed: {
+        color: "#f59e0b",
+        bg: "#fef3c7",
+        icon: "🔔",
+        pulse: true,
       },
-      "Completed": { 
-        color: "#059669", 
-        bg: "#a7f3d0", 
-        icon: "✅", 
-        pulse: false 
+      Collected: {
+        color: "#3b82f6",
+        bg: "#dbeafe",
+        icon: "📦",
+        pulse: false,
       },
-      "Cancelled": { 
-        color: "#ef4444", 
-        bg: "#fecaca", 
-        icon: "❌", 
-        pulse: false 
-      }
+      Completed: {
+        color: "#059669",
+        bg: "#a7f3d0",
+        icon: "✅",
+        pulse: false,
+      },
+      Cancelled: {
+        color: "#ef4444",
+        bg: "#fecaca",
+        icon: "❌",
+        pulse: false,
+      },
     };
     return configs[status] || configs["Available"];
   };
@@ -270,7 +239,7 @@ const ActiveDonations = () => {
       month: "short",
       day: "numeric",
       hour: "2-digit",
-      minute: "2-digit"
+      minute: "2-digit",
     });
   };
 
@@ -279,7 +248,7 @@ const ActiveDonations = () => {
     const now = new Date();
     const date = new Date(dateString);
     const diffInHours = (now - date) / (1000 * 60 * 60);
-    
+
     if (diffInHours < 1) return "Just now";
     if (diffInHours < 24) return `${Math.floor(diffInHours)}h ago`;
     const diffInDays = Math.floor(diffInHours / 24);
@@ -318,42 +287,28 @@ const ActiveDonations = () => {
 
   return (
     <div className="modern-donations">
-      {/* Header Section */}
-      <div className="donations-header">
-        <div className="header-main">
-          <h1>My Food Donations</h1>
-          <p>Track and manage your contribution to reducing food waste</p>
-        </div>
-        
-        <div className="header-stats">
-          <div className="stat-item">
-            <span className="stat-number">{donations.length}</span>
-            <span className="stat-label">Total</span>
-          </div>
-          <div className="stat-item">
-            <span className="stat-number">{donations.filter(d => d.status === "Available").length}</span>
-            <span className="stat-label">Active</span>
-          </div>
-          <div className="stat-item">
-            <span className="stat-number">{donations.filter(d => d.status === "Completed").length}</span>
-            <span className="stat-label">Completed</span>
-          </div>
-        </div>
-      </div>
-
       {/* Controls Section */}
       <div className="donations-controls">
         <div className="filter-section">
           <div className="filter-pills">
             {[
               { key: "all", label: "All", count: donations.length },
-              { key: "active", label: "Active", count: donations.filter(d => d.status === "Available").length },
-              { key: "completed", label: "Completed", count: donations.filter(d => ["Completed", "Collected"].includes(d.status)).length },
-              { key: "cancelled", label: "Cancelled", count: donations.filter(d => d.status === "Cancelled").length }
-            ].map(filter => (
+              {
+                key: "active",
+                label: "Active",
+                count: donations.filter((d) => d.status === "Available").length,
+              },
+              {
+                key: "claimed",
+                label: "Claimed",
+                count: donations.filter((d) => d.status === "Claimed").length,
+              },
+            ].map((filter) => (
               <button
                 key={filter.key}
-                className={`filter-pill ${statusFilter === filter.key ? "active" : ""}`}
+                className={`filter-pill ${
+                  statusFilter === filter.key ? "active" : ""
+                }`}
                 onClick={() => setStatusFilter(filter.key)}
               >
                 {filter.label}
@@ -365,20 +320,20 @@ const ActiveDonations = () => {
 
         <div className="view-controls">
           <div className="view-toggle">
-            <button 
+            <button
               className={`view-btn ${viewMode === "grid" ? "active" : ""}`}
               onClick={() => setViewMode("grid")}
             >
               <span className="view-icon">▦</span>
             </button>
-            <button 
+            <button
               className={`view-btn ${viewMode === "list" ? "active" : ""}`}
               onClick={() => setViewMode("list")}
             >
               <span className="view-icon">☰</span>
             </button>
           </div>
-          
+
           <button onClick={fetchMyDonations} className="refresh-button">
             <span className="refresh-icon">↻</span>
             Refresh
@@ -392,17 +347,20 @@ const ActiveDonations = () => {
           <div className="empty-illustration">🍽️</div>
           <h3>No donations found</h3>
           <p>
-            {statusFilter === "all" 
+            {statusFilter === "all"
               ? "Start making a difference by donating food to those in need"
-              : `No ${statusFilter} donations at the moment`
-            }
+              : `No ${statusFilter} donations at the moment`}
           </p>
         </div>
       ) : (
-        <div className={`donations-grid ${viewMode === "list" ? "list-view" : "grid-view"}`}>
+        <div
+          className={`donations-grid ${
+            viewMode === "list" ? "list-view" : "grid-view"
+          }`}
+        >
           {filteredDonations.map((donation) => {
             const statusConfig = getStatusConfig(donation.status);
-            
+
             return (
               <div key={donation.id} className="donation-item">
                 {/* Image Section */}
@@ -410,7 +368,7 @@ const ActiveDonations = () => {
                   <div className="item-image">
                     <img src={donation.imageURL} alt={donation.foodType} />
                     <div className="image-overlay">
-                      <button 
+                      <button
                         className="view-button"
                         onClick={() => setSelectedDonation(donation)}
                       >
@@ -427,13 +385,15 @@ const ActiveDonations = () => {
                       <h3>{donation.foodType}</h3>
                       <span className="item-quantity">{donation.quantity}</span>
                     </div>
-                    
+
                     <div className="item-status">
-                      <span 
-                        className={`status-dot ${statusConfig.pulse ? 'pulse' : ''}`}
+                      <span
+                        className={`status-dot ${
+                          statusConfig.pulse ? "pulse" : ""
+                        }`}
                         style={{ backgroundColor: statusConfig.color }}
                       ></span>
-                      <span 
+                      <span
                         className="status-text"
                         style={{ color: statusConfig.color }}
                       >
@@ -447,7 +407,7 @@ const ActiveDonations = () => {
                       <span className="detail-icon">📍</span>
                       <span className="detail-text">{donation.location}</span>
                     </div>
-                    
+
                     <div className="detail-row">
                       <span className="detail-icon">📅</span>
                       <span className="detail-text">
@@ -477,54 +437,41 @@ const ActiveDonations = () => {
                       <>
                         <button
                           className="action-button secondary"
-                          onClick={() => updateStatus(donation.listingID, "Cancelled")}
+                          onClick={() =>
+                            updateStatus(donation.listingID, "Cancelled")
+                          }
                           disabled={updating === donation.listingID}
                         >
                           {updating === donation.listingID ? "..." : "Cancel"}
                         </button>
-                        <button
-                          className="action-button primary"
-                          onClick={() => updateStatus(donation.listingID, "Collected")}
-                          disabled={updating === donation.listingID}
-                        >
-                          {updating === donation.listingID ? "..." : "Mark Collected"}
-                        </button>
                       </>
                     )}
 
-                    {donation.status === "Collected" && (
-                      <>
-                        <button
-                          className="action-button chat"
-                          onClick={() => openChatModal(donation)}
-                        >
-                          💬 Chat
-                        </button>
-                        <button
-                          className="action-button primary"
-                          onClick={() => updateStatus(donation.listingID, "Completed")}
-                          disabled={updating === donation.listingID}
-                        >
-                          {updating === donation.listingID ? "..." : "Mark Complete"}
-                        </button>
-                      </>
-                    )}
+                  {donation.status === "Claimed" && (
+  <div className="claimed-info">
+    <span className="claimed-text">
+      🔔 Claimed by {donation.claimedByEmail || "Unknown"}
+    </span>
+  </div>
+)}
 
-                    {donation.status === "Completed" && isDonationClaimed(donation) && (
-                      <button
-                        className="action-button chat"
-                        onClick={() => openChatModal(donation)}
-                      >
-                        💬 Chat History
-                      </button>
-                    )}
+<button
+  className="action-button outline"
+  onClick={() => setSelectedDonation(donation)}
+>
+  Details
+</button>
 
-                    <button 
-                      className="action-button outline"
-                      onClick={() => setSelectedDonation(donation)}
-                    >
-                      Details
-                    </button>
+{donation.status === "Claimed" && (
+  <button
+    className="action-button chat"
+    onClick={() => openChatModal(donation)}
+  >
+    💬 Chat
+  </button>
+)}
+
+              
                   </div>
                 </div>
               </div>
@@ -535,11 +482,14 @@ const ActiveDonations = () => {
 
       {/* Modal */}
       {selectedDonation && (
-        <div className="modal-backdrop" onClick={() => setSelectedDonation(null)}>
+        <div
+          className="modal-backdrop"
+          onClick={() => setSelectedDonation(null)}
+        >
           <div className="modern-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>{selectedDonation.foodType}</h2>
-              <button 
+              <button
                 className="close-button"
                 onClick={() => setSelectedDonation(null)}
               >
@@ -550,7 +500,10 @@ const ActiveDonations = () => {
             <div className="modal-body">
               {selectedDonation.imageURL && (
                 <div className="modal-image">
-                  <img src={selectedDonation.imageURL} alt={selectedDonation.foodType} />
+                  <img
+                    src={selectedDonation.imageURL}
+                    alt={selectedDonation.foodType}
+                  />
                 </div>
               )}
 
@@ -568,7 +521,11 @@ const ActiveDonations = () => {
                     </div>
                     <div className="grid-item">
                       <strong>Status:</strong>
-                      <span style={{ color: getStatusConfig(selectedDonation.status).color }}>
+                      <span
+                        style={{
+                          color: getStatusConfig(selectedDonation.status).color,
+                        }}
+                      >
                         {selectedDonation.status}
                       </span>
                     </div>
@@ -597,7 +554,9 @@ const ActiveDonations = () => {
                     {selectedDonation.scheduledTime && (
                       <div className="grid-item full-width">
                         <strong>Pickup By:</strong>
-                        <span>{formatDate(selectedDonation.scheduledTime)}</span>
+                        <span>
+                          {formatDate(selectedDonation.scheduledTime)}
+                        </span>
                       </div>
                     )}
                   </div>
@@ -606,21 +565,44 @@ const ActiveDonations = () => {
                 {selectedDonation.description && (
                   <div className="detail-section">
                     <h4>Description</h4>
-                    <p className="description-text">{selectedDonation.description}</p>
+                    <p className="description-text">
+                      {selectedDonation.description}
+                    </p>
                   </div>
                 )}
 
                 {selectedDonation.specialInstructions && (
                   <div className="detail-section">
                     <h4>Special Instructions</h4>
-                    <p className="instruction-text">{selectedDonation.specialInstructions}</p>
+                    <p className="instruction-text">
+                      {selectedDonation.specialInstructions}
+                    </p>
                   </div>
+                )}
+
+
+                    {selectedDonation.status === "Claimed" && (
+                  <div className="detail-section">
+                    <h4>Claim Information</h4>
+                    <div className="detail-grid">
+                      <div className="grid-item">
+                        <strong>Claimed By:</strong>
+                        <span>{selectedDonation.claimedByEmail}</span>
+                      </div>
+                      <div className="grid-item">
+                        <strong>Claimed At:</strong>
+                        <span>{formatDate(selectedDonation.claimedAt)}</span>
+                      </div>
+                    </div>
+                  </div> 
+
+
                 )}
               </div>
             </div>
 
             <div className="modal-footer">
-              <button 
+              <button
                 className="modal-button secondary"
                 onClick={() => setSelectedDonation(null)}
               >
@@ -631,74 +613,47 @@ const ActiveDonations = () => {
         </div>
       )}
 
-      {/* Chat Modal */}
-      {chatModal.open && (
+
+       {chatModal.open && (
         <div className="modal-backdrop" onClick={closeChatModal}>
           <div className="chat-modal" onClick={(e) => e.stopPropagation()}>
             <div className="chat-header">
               <div className="chat-title">
                 <h3>💬 Chat - {chatModal.donation?.foodType}</h3>
-                <p>Communicate with the recipient</p>
+                <p>
+                  {loadingClaimer ? 'Loading...' : claimerData ? `With ${claimerData.name}` : 'Communicate with recipient'}
+                </p>
               </div>
-              <button className="close-button" onClick={closeChatModal}>
-                ✕
-              </button>
+              <button className="close-button" onClick={closeChatModal}>✕</button>
             </div>
 
             <div className="chat-body">
-              <div className="chat-messages">
-                {chatMessages.length === 0 ? (
-                  <div className="no-messages">
-                    <div className="no-messages-icon">💬</div>
-                    <p>No messages yet. Start a conversation!</p>
+              {claimerData && (
+                <div className="claimer-info">
+                  <div className="claimer-avatar">
+                    {claimerData.role === 'ngo' ? '🏢' : '👤'}
                   </div>
-                ) : (
-                  chatMessages.map((message) => (
-                    <div 
-                      key={message.id} 
-                      className={`message ${message.sender === 'donor' ? 'own-message' : 'other-message'}`}
-                    >
-                      <div className="message-avatar">
-                        {message.avatar}
-                      </div>
-                      <div className="message-content">
-                        <div className="message-header">
-                          <span className="message-sender">{message.senderName}</span>
-                          <span className="message-time">{formatChatTime(message.timestamp)}</span>
-                        </div>
-                        <div className="message-text">
-                          {message.message}
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              <div className="chat-input-section">
-                <div className="chat-input-container">
-                  <textarea
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    onKeyPress={handleChatKeyPress}
-                    placeholder="Type your message..."
-                    className="chat-input"
-                    rows="2"
-                  />
-                  <button 
-                    className="send-button"
-                    onClick={sendMessage}
-                    disabled={!newMessage.trim()}
-                  >
-                    <span className="send-icon">➤</span>
-                  </button>
+                  <div className="claimer-details">
+                    <h4>{claimerData.name}</h4>
+                    <p>{claimerData.role.toUpperCase()}</p>
+                    <p>📧 {claimerData.email}</p>
+                    <p>📞 {claimerData.phone}</p>
+                    {claimerData.address && <p>📍 {claimerData.address}</p>}
+                  </div>
                 </div>
-                <p className="chat-hint">Press Enter to send • Shift+Enter for new line</p>
+              )}
+              
+              <div className="chat-placeholder">
+                <div className="chat-placeholder-icon">💬</div>
+                <p>Chat functionality coming soon!</p>
+                <p>For now, you can contact them directly using the information above.</p>
               </div>
             </div>
           </div>
         </div>
       )}
+
+      
     </div>
   );
 };

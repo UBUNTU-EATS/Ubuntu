@@ -32,6 +32,74 @@ const verifyAuth = async (req) => {
   }
 };
 
+
+
+exports.getUserData = functions.https.onRequest(corsWrapper(async (req, res) => {
+  try {
+    if (req.method !== 'POST') {
+      return res.status(405).json({
+        success: false,
+        message: 'Method not allowed. Use POST.'
+      });
+    }
+
+    const { userId, userEmail } = req.body;
+
+    if (!userId && !userEmail) {
+      return res.status(400).json({
+        success: false,
+        message: 'userId or userEmail is required'
+      });
+    }
+
+    let userDoc;
+    
+    if (userEmail) {
+      userDoc = await admin.firestore().collection('users').doc(userEmail).get();
+    } else if (userId) {
+      // Search by userId field in users collection
+      const querySnapshot = await admin.firestore()
+        .collection('users')
+        .where('userId', '==', userId)
+        .limit(1)
+        .get();
+      
+      if (!querySnapshot.empty) {
+        userDoc = querySnapshot.docs[0];
+      }
+    }
+
+    if (!userDoc || !userDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const userData = userDoc.data();
+    
+    return res.status(200).json({
+      success: true,
+      user: {
+        name: userData.name,
+        email: userData.email,
+        phone: userData.phone,
+        address: userData.address,
+        role: userData.role,
+        registrationNumber: userData.registrationNumber,
+        contactPerson: userData.contactPerson
+      }
+    });
+
+  } catch (error) {
+    console.error("Error getting user data:", error);
+    return res.status(500).json({
+      success: false,
+      message: `Failed to get user data: ${error.message}`
+    });
+  }
+}));
+
 // Create a donation listing in foodListings collection
 exports.createDonationListing = functions.https.onRequest(corsWrapper(async (req, res) => {
   try {
