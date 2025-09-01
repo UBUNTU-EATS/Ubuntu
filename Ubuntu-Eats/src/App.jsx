@@ -21,6 +21,11 @@ import FarmersDashboard from './pages/FarmersDashboard';
 import IssuesPage from './pages/IssuePage';
 
 
+import AdminDashboard from "./pages/AdminDashboard";
+import SystemAnalytics from "./pages/SystemAnalytics";
+import DonationApprovals from "./pages/DonationApprovals";
+import UserManagement from "./pages/UserManagement";
+
 function App() {
   return (
     <Router>
@@ -44,6 +49,11 @@ function App() {
         <Route path="/UnifiedSignup" element={<UnifiedSignup />} />
         <Route path="/MyDeliveries" element={<MyDeliveries />} />
         <Route path="/AvailableDeliveries" element={<AvailableDeliveries />} />
+
+        <Route path="/AdminDashboard" element={<AdminDashboard />} />
+        <Route path="/SystemAnalytics" element={<SystemAnalytics />} />
+        <Route path="/DonationApprovals" element={<DonationApprovals />} />
+        <Route path="/UserManagement" element={<UserManagement />} />
       </Routes>
     </Router>
   );
