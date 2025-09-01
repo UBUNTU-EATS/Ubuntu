@@ -69,11 +69,8 @@ const LandingPage = () => {
       <section id="join" className="join">
         <h3>Be Part of the Change</h3>
         <p>Sign up today and help us provide meals, one pickup at a time.</p>
-        <Link to="/donor-dashboard">
+        <Link to="/AuthContainer">
           <button className="cta-btn">Get Started</button>
-        </Link>
-        <Link to="/NGODashboard">
-          <button className="cta-btn">NGODashboard</button>
         </Link>
       </section>
 
