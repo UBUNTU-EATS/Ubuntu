@@ -9,30 +9,23 @@ const AvailableDonations = ({ donations, onClaim }) => {
   });
 
   const [selectedDonation, setSelectedDonation] = useState(null);
+  const [claiming, setClaiming] = useState(false);
 
   const filteredDonations = donations.filter((donation) => {
-    if (filters.category !== "all" && donation.category !== filters.category) {
+    if (
+      filters.category !== "all" &&
+      donation.typeOfFood !== filters.category
+    ) {
       return false;
     }
-
-    if (filters.distance !== "all") {
-      const distance = parseFloat(donation.distance);
-      if (filters.distance === "under5" && distance > 5) return false;
-      if (filters.distance === "5to10" && (distance <= 5 || distance > 10))
-        return false;
-      if (filters.distance === "over10" && distance <= 10) return false;
-    }
-
     return true;
   });
 
   const sortedDonations = [...filteredDonations].sort((a, b) => {
     if (filters.sortBy === "newest") {
-      return new Date(b.pickupTime) - new Date(a.pickupTime);
-    } else if (filters.sortBy === "closest") {
-      return parseFloat(a.distance) - parseFloat(b.distance);
+      return new Date(b.createdAt) - new Date(a.createdAt);
     } else if (filters.sortBy === "quantity") {
-      return parseFloat(b.quantity) - parseFloat(a.quantity);
+      return parseInt(b.quantity) - parseInt(a.quantity);
     }
     return 0;
   });
@@ -44,8 +37,9 @@ const AvailableDonations = ({ donations, onClaim }) => {
     }));
   };
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
+  const formatDate = (timestamp) => {
+    if (!timestamp) return "N/A";
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
     return date.toLocaleDateString("en-ZA", {
       day: "2-digit",
       month: "short",
@@ -56,17 +50,17 @@ const AvailableDonations = ({ donations, onClaim }) => {
 
   const getCategoryIcon = (category) => {
     switch (category) {
-      case "fresh-meals":
+      case "Fresh Meals":
         return "🍽️";
-      case "bakery":
+      case "Baked Goods":
         return "🥐";
-      case "fruits-vegetables":
+      case "Fruits & Vegetables":
         return "🥦";
-      case "dairy":
+      case "Dairy Products":
         return "🥛";
-      case "packaged-goods":
+      case "Packaged Food":
         return "📦";
-      case "beverages":
+      case "Beverages":
         return "🥤";
       default:
         return "📦";
@@ -74,6 +68,7 @@ const AvailableDonations = ({ donations, onClaim }) => {
   };
 
   const getUrgencyColor = (expiryDate) => {
+    if (!expiryDate) return "normal";
     const today = new Date();
     const expiry = new Date(expiryDate);
     const diffTime = expiry - today;
@@ -84,10 +79,16 @@ const AvailableDonations = ({ donations, onClaim }) => {
     return "normal";
   };
 
-  const handleQuickClaim = (donationId) => {
-    onClaim(donationId);
-    // Show success notification
-    setSelectedDonation(null);
+  const handleQuickClaim = async (donationId) => {
+    setClaiming(true);
+    try {
+      await onClaim(donationId);
+      setSelectedDonation(null);
+    } catch (error) {
+      console.error("Error claiming donation:", error);
+    } finally {
+      setClaiming(false);
+    }
   };
 
   return (
@@ -107,26 +108,12 @@ const AvailableDonations = ({ donations, onClaim }) => {
             onChange={(e) => handleFilterChange("category", e.target.value)}
           >
             <option value="all">All Categories</option>
-            <option value="fresh-meals">Fresh Meals</option>
-            <option value="bakery">Bakery Items</option>
-            <option value="fruits-vegetables">Fruits & Vegetables</option>
-            <option value="dairy">Dairy Products</option>
-            <option value="packaged-goods">Packaged Goods</option>
-            <option value="beverages">Beverages</option>
-          </select>
-        </div>
-
-        <div className="filter-group">
-          <label htmlFor="distance">Distance:</label>
-          <select
-            id="distance"
-            value={filters.distance}
-            onChange={(e) => handleFilterChange("distance", e.target.value)}
-          >
-            <option value="all">Any Distance</option>
-            <option value="under5">Under 5 km</option>
-            <option value="5to10">5-10 km</option>
-            <option value="over10">Over 10 km</option>
+            <option value="Fresh Meals">Fresh Meals</option>
+            <option value="Baked Goods">Baked Goods</option>
+            <option value="Fruits & Vegetables">Fruits & Vegetables</option>
+            <option value="Dairy Products">Dairy Products</option>
+            <option value="Packaged Food">Packaged Food</option>
+            <option value="Beverages">Beverages</option>
           </select>
         </div>
 
@@ -138,7 +125,6 @@ const AvailableDonations = ({ donations, onClaim }) => {
             onChange={(e) => handleFilterChange("sortBy", e.target.value)}
           >
             <option value="newest">Newest First</option>
-            <option value="closest">Closest First</option>
             <option value="quantity">Largest Quantity</option>
           </select>
         </div>
@@ -162,26 +148,27 @@ const AvailableDonations = ({ donations, onClaim }) => {
             <div key={donation.id} className="donation-card">
               <div className="card-header">
                 <div className="donor-info">
-                  <h3>{donation.donorName}</h3>
-                  <span className="distance">{donation.distance} km away</span>
+                  <h3>{donation.listingCompany || donation.donorName}</h3>
                 </div>
                 <div className="category-badge">
-                  {getCategoryIcon(donation.category)}
-                  {donation.category.replace("-", " ")}
+                  {getCategoryIcon(donation.typeOfFood)}
+                  {donation.typeOfFood}
                 </div>
               </div>
 
               <div className="card-content">
                 <div className="food-details">
                   <h4>{donation.foodType}</h4>
-                  <p className="quantity">{donation.quantity}</p>
+                  <p className="quantity">
+                    {donation.quantity} {donation.unit}
+                  </p>
                 </div>
 
                 <div className="donation-meta">
                   <div className="meta-item">
                     <span className="meta-label">📅 Pickup By:</span>
                     <span className="meta-value">
-                      {formatDate(donation.pickupTime)}
+                      {formatDate(donation.collectBy)}
                     </span>
                   </div>
 
@@ -192,7 +179,7 @@ const AvailableDonations = ({ donations, onClaim }) => {
                         donation.expiryDate
                       )}`}
                     >
-                      {new Date(donation.expiryDate).toLocaleDateString()}
+                      {donation.expiryDate || "N/A"}
                       {getUrgencyColor(donation.expiryDate) === "urgent" &&
                         " ⚠️"}
                     </span>
@@ -200,7 +187,9 @@ const AvailableDonations = ({ donations, onClaim }) => {
 
                   <div className="meta-item">
                     <span className="meta-label">📍 Location:</span>
-                    <span className="meta-value">{donation.location}</span>
+                    <span className="meta-value">
+                      {donation.address || donation.location}
+                    </span>
                   </div>
 
                   {donation.specialInstructions && (
@@ -213,6 +202,12 @@ const AvailableDonations = ({ donations, onClaim }) => {
                   )}
                 </div>
 
+                {donation.imageURL && (
+                  <div className="donation-image">
+                    <img src={donation.imageURL} alt={donation.foodType} />
+                  </div>
+                )}
+
                 <div className="donation-actions">
                   <button
                     className="quick-view-btn"
@@ -223,8 +218,9 @@ const AvailableDonations = ({ donations, onClaim }) => {
                   <button
                     className="claim-btn"
                     onClick={() => handleQuickClaim(donation.id)}
+                    disabled={claiming}
                   >
-                    Claim Now
+                    {claiming ? "Claiming..." : "Claim Now"}
                   </button>
                 </div>
               </div>
@@ -241,7 +237,9 @@ const AvailableDonations = ({ donations, onClaim }) => {
         >
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>{selectedDonation.donorName}</h3>
+              <h3>
+                {selectedDonation.listingCompany || selectedDonation.donorName}
+              </h3>
               <button
                 className="close-btn"
                 onClick={() => setSelectedDonation(null)}
@@ -251,17 +249,31 @@ const AvailableDonations = ({ donations, onClaim }) => {
             </div>
 
             <div className="modal-body">
+              {selectedDonation.imageURL && (
+                <div className="modal-image">
+                  <img
+                    src={selectedDonation.imageURL}
+                    alt={selectedDonation.foodType}
+                  />
+                </div>
+              )}
+
               <div className="modal-section">
                 <h4>Food Details</h4>
                 <div className="food-info">
                   <span className="food-type">{selectedDonation.foodType}</span>
                   <span className="food-quantity">
-                    {selectedDonation.quantity}
+                    {selectedDonation.quantity} {selectedDonation.unit}
                   </span>
                   <span className="food-category">
-                    {getCategoryIcon(selectedDonation.category)}
-                    {selectedDonation.category.replace("-", " ")}
+                    {getCategoryIcon(selectedDonation.typeOfFood)}
+                    {selectedDonation.typeOfFood}
                   </span>
+                  {selectedDonation.listingDescription && (
+                    <p className="food-description">
+                      {selectedDonation.listingDescription}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -270,12 +282,14 @@ const AvailableDonations = ({ donations, onClaim }) => {
                 <div className="pickup-info">
                   <div className="info-row">
                     <span className="label">📍 Location:</span>
-                    <span className="value">{selectedDonation.location}</span>
+                    <span className="value">
+                      {selectedDonation.address || selectedDonation.location}
+                    </span>
                   </div>
                   <div className="info-row">
                     <span className="label">📅 Pickup By:</span>
                     <span className="value">
-                      {formatDate(selectedDonation.pickupTime)}
+                      {formatDate(selectedDonation.collectBy)}
                     </span>
                   </div>
                   <div className="info-row">
@@ -285,15 +299,14 @@ const AvailableDonations = ({ donations, onClaim }) => {
                         selectedDonation.expiryDate
                       )}`}
                     >
-                      {new Date(
-                        selectedDonation.expiryDate
-                      ).toLocaleDateString()}
+                      {selectedDonation.expiryDate || "N/A"}
                     </span>
                   </div>
                   <div className="info-row">
-                    <span className="label">📏 Distance:</span>
+                    <span className="label">📞 Contact:</span>
                     <span className="value">
-                      {selectedDonation.distance} km away
+                      {selectedDonation.contactPerson} -{" "}
+                      {selectedDonation.contactPhone}
                     </span>
                   </div>
                 </div>
@@ -318,8 +331,9 @@ const AvailableDonations = ({ donations, onClaim }) => {
                 <button
                   className="modal-claim-btn"
                   onClick={() => handleQuickClaim(selectedDonation.id)}
+                  disabled={claiming}
                 >
-                  Claim This Donation
+                  {claiming ? "Claiming..." : "Claim This Donation"}
                 </button>
               </div>
             </div>

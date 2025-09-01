@@ -8,14 +8,16 @@ const ClaimedDonations = ({
   onCancelClaim,
 }) => {
   const [activeFilter, setActiveFilter] = useState("all");
+  const [processing, setProcessing] = useState(null);
 
   const filteredDonations = donations.filter((donation) => {
     if (activeFilter === "all") return true;
     return donation.status === activeFilter;
   });
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
+  const formatDate = (timestamp) => {
+    if (!timestamp) return "N/A";
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
     return date.toLocaleDateString("en-ZA", {
       day: "2-digit",
       month: "short",
@@ -26,11 +28,11 @@ const ClaimedDonations = ({
 
   const getStatusColor = (status) => {
     switch (status) {
-      case "claimed":
+      case "CLAIMED":
         return "status-claimed";
-      case "collected":
+      case "COLLECTED":
         return "status-collected";
-      case "cancelled":
+      case "CANCELLED":
         return "status-cancelled";
       default:
         return "status-claimed";
@@ -39,20 +41,53 @@ const ClaimedDonations = ({
 
   const getCategoryIcon = (category) => {
     switch (category) {
-      case "fresh-meals":
+      case "Fresh Meals":
         return "🍽️";
-      case "bakery":
+      case "Baked Goods":
         return "🥐";
-      case "fruits-vegetables":
+      case "Fruits & Vegetables":
         return "🥦";
-      case "dairy":
+      case "Dairy Products":
         return "🥛";
-      case "packaged-goods":
+      case "Packaged Food":
         return "📦";
-      case "beverages":
+      case "Beverages":
         return "🥤";
       default:
         return "📦";
+    }
+  };
+
+  const handleSetCollectionMethod = async (claimId, method) => {
+    setProcessing(claimId);
+    try {
+      await onSetCollectionMethod(claimId, method);
+    } catch (error) {
+      console.error("Error setting collection method:", error);
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  const handleConfirmCollection = async (claimId, listingId) => {
+    setProcessing(claimId);
+    try {
+      await onConfirmCollection(claimId, listingId);
+    } catch (error) {
+      console.error("Error confirming collection:", error);
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  const handleCancelClaim = async (claimId, listingId) => {
+    setProcessing(claimId);
+    try {
+      await onCancelClaim(claimId, listingId);
+    } catch (error) {
+      console.error("Error canceling claim:", error);
+    } finally {
+      setProcessing(null);
     }
   };
 
@@ -72,18 +107,18 @@ const ClaimedDonations = ({
           All Claims ({donations.length})
         </button>
         <button
-          className={`filter-tab ${activeFilter === "claimed" ? "active" : ""}`}
-          onClick={() => setActiveFilter("claimed")}
+          className={`filter-tab ${activeFilter === "CLAIMED" ? "active" : ""}`}
+          onClick={() => setActiveFilter("CLAIMED")}
         >
-          To Collect ({donations.filter((d) => d.status === "claimed").length})
+          To Collect ({donations.filter((d) => d.status === "CLAIMED").length})
         </button>
         <button
           className={`filter-tab ${
-            activeFilter === "collected" ? "active" : ""
+            activeFilter === "COLLECTED" ? "active" : ""
           }`}
-          onClick={() => setActiveFilter("collected")}
+          onClick={() => setActiveFilter("COLLECTED")}
         >
-          Collected ({donations.filter((d) => d.status === "collected").length})
+          Collected ({donations.filter((d) => d.status === "COLLECTED").length})
         </button>
       </div>
 
@@ -100,10 +135,10 @@ const ClaimedDonations = ({
       ) : (
         <div className="claimed-list">
           {filteredDonations.map((donation) => (
-            <div key={donation.id} className="claimed-card">
+            <div key={donation.claimId} className="claimed-card">
               <div className="card-header">
                 <div className="donor-info">
-                  <h3>{donation.donorName}</h3>
+                  <h3>{donation.listingCompany || donation.donorName}</h3>
                   <span className="claim-date">
                     Claimed on {formatDate(donation.claimDate)}
                   </span>
@@ -115,11 +150,11 @@ const ClaimedDonations = ({
                     )}`}
                   >
                     {donation.status.charAt(0).toUpperCase() +
-                      donation.status.slice(1)}
+                      donation.status.slice(1).toLowerCase()}
                   </span>
                   <div className="category-badge">
-                    {getCategoryIcon(donation.category)}
-                    {donation.category.replace("-", " ")}
+                    {getCategoryIcon(donation.typeOfFood)}
+                    {donation.typeOfFood}
                   </div>
                 </div>
               </div>
@@ -127,19 +162,35 @@ const ClaimedDonations = ({
               <div className="card-content">
                 <div className="food-details">
                   <h4>{donation.foodType}</h4>
-                  <p className="quantity">{donation.quantity}</p>
+                  <p className="quantity">
+                    {donation.quantity} {donation.unit}
+                  </p>
                 </div>
+
+                {donation.imageURL && (
+                  <div className="claimed-image">
+                    <img src={donation.imageURL} alt={donation.foodType} />
+                  </div>
+                )}
 
                 <div className="donation-meta">
                   <div className="meta-item">
                     <span className="meta-label">📅 Pickup By:</span>
                     <span className="meta-value">
-                      {formatDate(donation.pickupTime)}
+                      {formatDate(donation.collectBy)}
                     </span>
                   </div>
                   <div className="meta-item">
                     <span className="meta-label">📍 Location:</span>
-                    <span className="meta-value">{donation.location}</span>
+                    <span className="meta-value">
+                      {donation.address || donation.location}
+                    </span>
+                  </div>
+                  <div className="meta-item">
+                    <span className="meta-label">📞 Contact:</span>
+                    <span className="meta-value">
+                      {donation.contactPerson} - {donation.contactPhone}
+                    </span>
                   </div>
                   {donation.specialInstructions && (
                     <div className="meta-item">
@@ -151,7 +202,7 @@ const ClaimedDonations = ({
                   )}
                 </div>
 
-                {donation.status === "claimed" && (
+                {donation.status === "CLAIMED" && (
                   <div className="collection-method">
                     <h4>Collection Method</h4>
                     <div className="method-options">
@@ -160,10 +211,13 @@ const ClaimedDonations = ({
                           donation.collectionMethod === "self" ? "active" : ""
                         }`}
                         onClick={() =>
-                          onSetCollectionMethod(donation.id, "self")
+                          handleSetCollectionMethod(donation.claimId, "self")
                         }
+                        disabled={processing === donation.claimId}
                       >
-                        🚗 Self Collection
+                        {processing === donation.claimId
+                          ? "Processing..."
+                          : "🚗 Self Collection"}
                       </button>
                       <button
                         className={`method-btn ${
@@ -172,17 +226,23 @@ const ClaimedDonations = ({
                             : ""
                         }`}
                         onClick={() =>
-                          onSetCollectionMethod(donation.id, "volunteer")
+                          handleSetCollectionMethod(
+                            donation.claimId,
+                            "volunteer"
+                          )
                         }
+                        disabled={processing === donation.claimId}
                       >
-                        🤝 Volunteer Assistance
+                        {processing === donation.claimId
+                          ? "Processing..."
+                          : "🤝 Volunteer Assistance"}
                       </button>
                     </div>
                   </div>
                 )}
 
                 {donation.collectionMethod === "volunteer" &&
-                  donation.status === "claimed" && (
+                  donation.status === "CLAIMED" && (
                     <div className="volunteer-info">
                       <div className="volunteer-assigned">
                         <span className="waiting-text">
@@ -193,7 +253,7 @@ const ClaimedDonations = ({
                   )}
 
                 {donation.collectionMethod === "self" &&
-                  donation.status === "claimed" && (
+                  donation.status === "CLAIMED" && (
                     <div className="collection-instructions">
                       <p>
                         Please collect the donation at the scheduled time. Don't
@@ -204,35 +264,42 @@ const ClaimedDonations = ({
               </div>
 
               <div className="card-actions">
-                {donation.status === "claimed" && (
+                {donation.status === "CLAIMED" && (
                   <>
                     <button
                       className="action-btn secondary"
-                      onClick={() => onCancelClaim(donation.id)}
+                      onClick={() =>
+                        handleCancelClaim(donation.claimId, donation.id)
+                      }
+                      disabled={processing === donation.claimId}
                     >
-                      Cancel Claim
+                      {processing === donation.claimId
+                        ? "Canceling..."
+                        : "Cancel Claim"}
                     </button>
                     {donation.collectionMethod === "self" && (
                       <button
                         className="action-btn primary"
-                        onClick={() => onConfirmCollection(donation.id)}
+                        onClick={() =>
+                          handleConfirmCollection(donation.claimId, donation.id)
+                        }
+                        disabled={processing === donation.claimId}
                       >
-                        Confirm Collection
+                        {processing === donation.claimId
+                          ? "Confirming..."
+                          : "Confirm Collection"}
                       </button>
                     )}
                   </>
                 )}
 
-                {donation.status === "collected" && (
+                {donation.status === "COLLECTED" && (
                   <div className="completion-info">
                     <span className="completed-text">
                       ✅ Successfully collected!
                     </span>
                     <span className="completion-date">
-                      Collected on{" "}
-                      {formatDate(
-                        donation.collectionDate || new Date().toISOString()
-                      )}
+                      Collected on {formatDate(donation.collectedAt)}
                     </span>
                   </div>
                 )}
