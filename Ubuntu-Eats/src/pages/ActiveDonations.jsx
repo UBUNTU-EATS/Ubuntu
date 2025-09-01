@@ -1,5 +1,13 @@
 import React, { useState, useEffect } from "react";
-import { auth } from "../../firebaseConfig";
+import { db, auth } from "../../firebaseConfig";
+import {
+  collection,
+  query,
+  orderBy,
+  onSnapshot,
+  addDoc,
+  serverTimestamp,
+} from "firebase/firestore";
 import "../styles/ActveDonations.css";
 
 const ActiveDonations = () => {
@@ -10,7 +18,9 @@ const ActiveDonations = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [updating, setUpdating] = useState(null);
   const [viewMode, setViewMode] = useState("grid"); // grid or list
-  const [chatMessages, setChatMessages] = useState([]);
+  const [messages, setMessages] = useState([]);
+  const [chatRoomId, setChatRoomId] = useState(null);
+  const [sendingMessage, setSendingMessage] = useState(false);
   const [newMessage, setNewMessage] = useState("");
   const [chatModal, setChatModal] = useState({ open: false, donation: null });
   const [claimerData, setClaimerData] = useState(null);
@@ -72,17 +82,87 @@ const ActiveDonations = () => {
   };
 
   // Open chat modal
-  const openChatModal = (donation) => {
+  const openChatModal = async (donation) => {
     setChatModal({ open: true, donation });
+    setMessages([]); // Clear previous messages
+
     if (donation.claimedByEmail || donation.claimedBy) {
       fetchClaimerData(donation.claimedByEmail, donation.claimedBy);
+
+      // Create/get chat room
+      try {
+        const result = await makeAuthenticatedRequest("createChatRoom", {
+          donorEmail: auth.currentUser.email,
+          ngoEmail: donation.claimedByEmail,
+          donationId: donation.listingID,
+        });
+
+        if (result.success) {
+          setChatRoomId(result.chatRoomId);
+          // Set up real-time message listener
+          setupMessageListener(result.chatRoomId);
+        }
+      } catch (error) {
+        console.error("Error setting up chat:", error);
+      }
     }
   };
 
-  // Close chat modal
   const closeChatModal = () => {
+    // Clean up message listener
+    if (chatModal.unsubscribe) {
+      chatModal.unsubscribe();
+    }
+
     setChatModal({ open: false, donation: null });
     setClaimerData(null);
+    setMessages([]);
+    setChatRoomId(null);
+    setNewMessage("");
+  };
+
+  const setupMessageListener = (roomId) => {
+    const messagesRef = collection(db, "chatRooms", roomId, "messages");
+    const q = query(messagesRef, orderBy("timestamp", "asc"));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const messagesList = [];
+      snapshot.forEach((doc) => {
+        messagesList.push({
+          id: doc.id,
+          ...doc.data(),
+        });
+      });
+      setMessages(messagesList);
+    });
+
+    // Store unsubscribe function to clean up later
+    setChatModal((prev) => ({ ...prev, unsubscribe }));
+  };
+
+  const sendMessage = async () => {
+    if (!newMessage.trim() || sendingMessage || !chatRoomId) return;
+
+    setSendingMessage(true);
+    try {
+      // Get user data for sender info
+      const user = auth.currentUser;
+      const userData = JSON.parse(localStorage.getItem("userData") || "{}");
+
+      await makeAuthenticatedRequest("sendMessage", {
+        chatRoomId,
+        message: newMessage.trim(),
+        senderName: userData.name || user.displayName || "User",
+        senderRole: userData.role || "donor",
+      });
+
+      setNewMessage("");
+    } catch (error) {
+      console.error("Error sending message:", error);
+      alert("Failed to send message");
+    } finally {
+      setSendingMessage(false);
+    }
   };
 
   // Fetch donor's donations
@@ -447,31 +527,29 @@ const ActiveDonations = () => {
                       </>
                     )}
 
-                  {donation.status === "Claimed" && (
-  <div className="claimed-info">
-    <span className="claimed-text">
-      🔔 Claimed by {donation.claimedByEmail || "Unknown"}
-    </span>
-  </div>
-)}
+                    {donation.status === "Claimed" && (
+                      <div className="claimed-info">
+                        <span className="claimed-text">
+                          🔔 Claimed by {donation.claimedByEmail || "Unknown"}
+                        </span>
+                      </div>
+                    )}
 
-<button
-  className="action-button outline"
-  onClick={() => setSelectedDonation(donation)}
->
-  Details
-</button>
+                    <button
+                      className="action-button outline"
+                      onClick={() => setSelectedDonation(donation)}
+                    >
+                      Details
+                    </button>
 
-{donation.status === "Claimed" && (
-  <button
-    className="action-button chat"
-    onClick={() => openChatModal(donation)}
-  >
-    💬 Chat
-  </button>
-)}
-
-              
+                    {donation.status === "Claimed" && (
+                      <button
+                        className="action-button chat"
+                        onClick={() => openChatModal(donation)}
+                      >
+                        💬 Chat
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -580,8 +658,7 @@ const ActiveDonations = () => {
                   </div>
                 )}
 
-
-                    {selectedDonation.status === "Claimed" && (
+                {selectedDonation.status === "Claimed" && (
                   <div className="detail-section">
                     <h4>Claim Information</h4>
                     <div className="detail-grid">
@@ -594,9 +671,7 @@ const ActiveDonations = () => {
                         <span>{formatDate(selectedDonation.claimedAt)}</span>
                       </div>
                     </div>
-                  </div> 
-
-
+                  </div>
                 )}
               </div>
             </div>
@@ -613,25 +688,30 @@ const ActiveDonations = () => {
         </div>
       )}
 
-
-       {chatModal.open && (
+      {chatModal.open && (
         <div className="modal-backdrop" onClick={closeChatModal}>
           <div className="chat-modal" onClick={(e) => e.stopPropagation()}>
             <div className="chat-header">
               <div className="chat-title">
                 <h3>💬 Chat - {chatModal.donation?.foodType}</h3>
                 <p>
-                  {loadingClaimer ? 'Loading...' : claimerData ? `With ${claimerData.name}` : 'Communicate with recipient'}
+                  {loadingClaimer
+                    ? "Loading..."
+                    : claimerData
+                    ? `With ${claimerData.name}`
+                    : "Communicate with recipient"}
                 </p>
               </div>
-              <button className="close-button" onClick={closeChatModal}>✕</button>
+              <button className="close-button" onClick={closeChatModal}>
+                ✕
+              </button>
             </div>
 
             <div className="chat-body">
               {claimerData && (
                 <div className="claimer-info">
                   <div className="claimer-avatar">
-                    {claimerData.role === 'ngo' ? '🏢' : '👤'}
+                    {claimerData.role === "ngo" ? "🏢" : "👤"}
                   </div>
                   <div className="claimer-details">
                     <h4>{claimerData.name}</h4>
@@ -642,18 +722,62 @@ const ActiveDonations = () => {
                   </div>
                 </div>
               )}
-              
-              <div className="chat-placeholder">
-                <div className="chat-placeholder-icon">💬</div>
-                <p>Chat functionality coming soon!</p>
-                <p>For now, you can contact them directly using the information above.</p>
+
+              {/* Replace the chat-placeholder div with this */}
+              <div className="chat-messages-container">
+                <div className="messages-list">
+                  {messages.length === 0 ? (
+                    <div className="no-messages">
+                      <div className="no-messages-icon">💬</div>
+                      <p>Start a conversation with {claimerData?.name}</p>
+                    </div>
+                  ) : (
+                    messages.map((message) => (
+                      <div
+                        key={message.id}
+                        className={`message ${
+                          message.senderEmail === auth.currentUser?.email
+                            ? "own-message"
+                            : "other-message"
+                        }`}
+                      >
+                        <div className="message-content">
+                          <p>{message.text}</p>
+                          <span className="message-time">
+                            {message.timestamp
+                              ?.toDate()
+                              .toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="message-input-form">
+                  <input
+                    type="text"
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Type your message..."
+                    onKeyPress={(e) => e.key === "Enter" && sendMessage()}
+                    disabled={sendingMessage}
+                  />
+                  <button
+                    onClick={sendMessage}
+                    disabled={sendingMessage || !newMessage.trim()}
+                  >
+                    {sendingMessage ? "..." : "Send"}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </div>
       )}
-
-      
     </div>
   );
 };

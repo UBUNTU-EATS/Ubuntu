@@ -595,3 +595,155 @@ exports.getDonorDonations = functions.https.onRequest(corsWrapper(async (req, re
     });
   }
 }));
+
+
+// Create or get chat room between donor and NGO
+exports.createChatRoom = functions.https.onRequest(corsWrapper(async (req, res) => {
+  try {
+    if (req.method !== 'POST') {
+      return res.status(405).json({ success: false, message: 'Method not allowed' });
+    }
+
+    const user = await verifyAuth(req);
+    const { donorEmail, ngoEmail, donationId } = req.body;
+
+    if (!donorEmail || !ngoEmail || !donationId) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'donorEmail, ngoEmail, and donationId are required' 
+      });
+    }
+
+    // Create unique chat room ID
+    const chatRoomId = `${donorEmail.replace('@', '_')}_${ngoEmail.replace('@', '_')}_${donationId}`;
+    
+    const chatRoomRef = admin.firestore().collection('chatRooms').doc(chatRoomId);
+    const chatRoomDoc = await chatRoomRef.get();
+
+    if (!chatRoomDoc.exists) {
+      // Create new chat room
+      await chatRoomRef.set({
+        id: chatRoomId,
+        donorEmail,
+        ngoEmail,
+        donationId,
+        participants: [donorEmail, ngoEmail],
+        createdAt: admin.firestore.Timestamp.now(),
+        lastMessage: null,
+        lastMessageTime: null
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      chatRoomId
+    });
+
+  } catch (error) {
+    console.error("Error creating chat room:", error);
+    return res.status(500).json({
+      success: false,
+      message: `Failed to create chat room: ${error.message}`
+    });
+  }
+}));
+
+// Send message to chat room
+exports.sendMessage = functions.https.onRequest(corsWrapper(async (req, res) => {
+  try {
+    if (req.method !== 'POST') {
+      return res.status(405).json({ success: false, message: 'Method not allowed' });
+    }
+
+    const user = await verifyAuth(req);
+    const { chatRoomId, message, senderName, senderRole } = req.body;
+
+    if (!chatRoomId || !message || !senderName) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'chatRoomId, message, and senderName are required' 
+      });
+    }
+
+    // Verify user is participant in chat room
+    const chatRoomRef = admin.firestore().collection('chatRooms').doc(chatRoomId);
+    const chatRoomDoc = await chatRoomRef.get();
+
+    if (!chatRoomDoc.exists) {
+      return res.status(404).json({ success: false, message: 'Chat room not found' });
+    }
+
+    const chatRoomData = chatRoomDoc.data();
+    if (!chatRoomData.participants.includes(user.email)) {
+      return res.status(403).json({ success: false, message: 'Not authorized to send messages in this chat' });
+    }
+
+    // Add message to subcollection
+    const messagesRef = admin.firestore()
+      .collection('chatRooms')
+      .doc(chatRoomId)
+      .collection('messages');
+
+    await messagesRef.add({
+      text: message,
+      senderEmail: user.email,
+      senderName,
+      senderRole: senderRole || 'user',
+      timestamp: admin.firestore.Timestamp.now(),
+      read: false
+    });
+
+    // Update chat room with last message info
+    await chatRoomRef.update({
+      lastMessage: message,
+      lastMessageTime: admin.firestore.Timestamp.now()
+    });
+
+    return res.status(200).json({ success: true });
+
+  } catch (error) {
+    console.error("Error sending message:", error);
+    return res.status(500).json({
+      success: false,
+      message: `Failed to send message: ${error.message}`
+    });
+  }
+}));
+
+// Get user's chat rooms
+exports.getUserChatRooms = functions.https.onRequest(corsWrapper(async (req, res) => {
+  try {
+    if (req.method !== 'POST') {
+      return res.status(405).json({ success: false, message: 'Method not allowed' });
+    }
+
+    const user = await verifyAuth(req);
+    
+    const chatRoomsRef = admin.firestore().collection('chatRooms');
+    const snapshot = await chatRoomsRef
+      .where('participants', 'array-contains', user.email)
+      .orderBy('lastMessageTime', 'desc')
+      .get();
+
+    const chatRooms = [];
+    snapshot.forEach(doc => {
+      chatRooms.push({
+        id: doc.id,
+        ...doc.data()
+      });
+    });
+
+    return res.status(200).json({
+      success: true,
+      chatRooms
+    });
+
+  } catch (error) {
+    console.error("Error getting chat rooms:", error);
+    return res.status(500).json({
+      success: false,
+      message: `Failed to get chat rooms: ${error.message}`
+    });
+  }
+}));
+
