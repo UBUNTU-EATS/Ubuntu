@@ -659,3 +659,36 @@
   outline: 3px solid #2e7d32;
   outline-offset: 2px;
 }
+
+/* Wrapper for avatar + logout button */
+.avatar-logout-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  position: relative;
+}
+
+/* Logout button next to avatar */
+.logout-btn {
+  background: linear-gradient(135deg, #ff3d00 0%, #ff7043 100%);
+  color: white;
+  border: none;
+  padding: 0.6rem 1.2rem;
+  border-radius: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+  letter-spacing: 0.5px;
+}
+
+.logout-btn:hover {
+  background: linear-gradient(135deg, #e53935 0%, #d84315 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(255, 77, 0, 0.4);
+}
+
+.logout-btn:focus-visible {
+  outline: 3px solid #ff7043;
+  outline-offset: 2px;
+}

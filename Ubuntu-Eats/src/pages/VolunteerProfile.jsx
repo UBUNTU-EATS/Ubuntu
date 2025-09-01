@@ -1,22 +1,70 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "../styles/VolunteerProfile.css";
+import { db, auth } from "../../firebaseConfig";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { useNavigate } from "react-router-dom";
 
-const VolunteerProfile = ({ volunteerData, setVolunteerData }) => {
+const VolunteerProfile = () => {
+  const navigate = useNavigate(); 
+  const [volunteerData, setVolunteerData] = useState(null);
+  const [formData, setFormData] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState(volunteerData);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchVolunteer = async () => {
+      try {
+        const user = auth.currentUser;
+        if (!user) {
+          console.error("User not logged in");
+          setLoading(false);
+          return;
+        }
+
+        const docRef = doc(db, "users", user.email);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data.role !== "volunteer") {
+            console.error("This user is not registered as a volunteer.");
+            setLoading(false);
+            return;
+          }
+          setVolunteerData(data);
+          setFormData(data);
+        } else {
+          console.error("No volunteer profile found for this user.");
+        }
+      } catch (err) {
+        console.error("Error fetching volunteer profile:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchVolunteer();
+  }, []);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setVolunteerData(formData);
-    setIsEditing(false);
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+
+      const docRef = doc(db, "users", user.email);
+      await updateDoc(docRef, formData);
+
+      setVolunteerData(formData);
+      setIsEditing(false);
+    } catch (err) {
+      console.error("Error updating volunteer profile:", err);
+    }
   };
 
   const handleCancel = () => {
@@ -24,12 +72,32 @@ const VolunteerProfile = ({ volunteerData, setVolunteerData }) => {
     setIsEditing(false);
   };
 
+  if (loading) return <p>Loading Volunteer Profile...</p>;
+  if (!volunteerData) return <p>No volunteer profile found.</p>;
+
+  const verified = volunteerData.status === "verified";
+
   return (
     <div className="volunteer-profile">
       <div className="profile-header">
-        <h2>Volunteer Profile</h2>
-        <p>Manage your volunteer information and preferences</p>
-      </div>
+  <div className="header-left">
+    <h2>Volunteer Profile</h2>
+    <p>Manage your volunteer information and preferences</p>
+  </div>
+
+  <div className="header-right">
+    <button
+      className="logout-btn"
+      onClick={async () => {
+        await auth.signOut();
+        navigate("/"); 
+      }}
+    >
+      Logout
+    </button>
+  </div>
+</div>
+
 
       <div className="profile-content">
         <div className="profile-card">
@@ -51,7 +119,7 @@ const VolunteerProfile = ({ volunteerData, setVolunteerData }) => {
                     type="text"
                     id="name"
                     name="name"
-                    value={formData.name}
+                    value={formData.name || ""}
                     onChange={handleInputChange}
                     required
                   />
@@ -63,9 +131,8 @@ const VolunteerProfile = ({ volunteerData, setVolunteerData }) => {
                     type="email"
                     id="email"
                     name="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    required
+                    value={formData.email || ""}
+                    disabled
                   />
                 </div>
 
@@ -75,7 +142,7 @@ const VolunteerProfile = ({ volunteerData, setVolunteerData }) => {
                     type="tel"
                     id="phone"
                     name="phone"
-                    value={formData.phone}
+                    value={formData.phone || ""}
                     onChange={handleInputChange}
                     required
                   />
@@ -86,7 +153,7 @@ const VolunteerProfile = ({ volunteerData, setVolunteerData }) => {
                   <select
                     id="vehicleType"
                     name="vehicleType"
-                    value={formData.vehicleType}
+                    value={formData.vehicleType || ""}
                     onChange={handleInputChange}
                     required
                   >
@@ -105,7 +172,7 @@ const VolunteerProfile = ({ volunteerData, setVolunteerData }) => {
                   <select
                     id="availability"
                     name="availability"
-                    value={formData.availability}
+                    value={formData.availability || ""}
                     onChange={handleInputChange}
                     required
                   >
@@ -124,7 +191,7 @@ const VolunteerProfile = ({ volunteerData, setVolunteerData }) => {
                   <select
                     id="maxDistance"
                     name="maxDistance"
-                    value={formData.maxDistance}
+                    value={formData.maxDistance || ""}
                     onChange={handleInputChange}
                     required
                   >
@@ -143,7 +210,7 @@ const VolunteerProfile = ({ volunteerData, setVolunteerData }) => {
                   <textarea
                     id="address"
                     name="address"
-                    value={formData.address}
+                    value={formData.address || ""}
                     onChange={handleInputChange}
                     rows="3"
                     required
@@ -184,23 +251,17 @@ const VolunteerProfile = ({ volunteerData, setVolunteerData }) => {
 
                 <div className="info-item">
                   <span className="info-label">Vehicle Type:</span>
-                  <span className="info-value">
-                    {volunteerData.vehicleType}
-                  </span>
+                  <span className="info-value">{volunteerData.vehicleType}</span>
                 </div>
 
                 <div className="info-item">
                   <span className="info-label">Availability:</span>
-                  <span className="info-value">
-                    {volunteerData.availability}
-                  </span>
+                  <span className="info-value">{volunteerData.availability}</span>
                 </div>
 
                 <div className="info-item">
                   <span className="info-label">Max Distance:</span>
-                  <span className="info-value">
-                    {volunteerData.maxDistance}
-                  </span>
+                  <span className="info-value">{volunteerData.maxDistance}</span>
                 </div>
 
                 <div className="info-item full-width">
@@ -210,14 +271,19 @@ const VolunteerProfile = ({ volunteerData, setVolunteerData }) => {
               </div>
 
               <div className="verification-status">
-                <div className="status-badge verified">
-                  <span className="status-icon">✅</span>
-                  Verified Volunteer
+                <div
+                  className={`status-badge ${verified ? "verified" : "pending"}`}
+                >
+                  <span className="status-icon">
+                    {verified ? "✅" : "⌛"}
+                  </span>
+                  {verified ? "Verified Volunteer" : "Verification Pending"}
                 </div>
-                <p className="status-note">
-                  Thank you for your service to the community! Your help makes a
-                  real difference.
-                </p>
+                {!verified && (
+                  <p className="status-note">
+                    Your volunteer account is awaiting admin verification.
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -228,20 +294,20 @@ const VolunteerProfile = ({ volunteerData, setVolunteerData }) => {
           <div className="stats-grid">
             <div className="stat-item">
               <span className="stat-number">
-                {volunteerData.completedDeliveries}
+                {volunteerData.completedDeliveries || 0}
               </span>
               <span className="stat-label">Completed Deliveries</span>
             </div>
             <div className="stat-item">
-              <span className="stat-number">156</span>
+              <span className="stat-number">{volunteerData.mealsDelivered || 0}</span>
               <span className="stat-label">Meals Delivered</span>
             </div>
             <div className="stat-item">
-              <span className="stat-number">98%</span>
+              <span className="stat-number">{volunteerData.successRate || "0%"}</span>
               <span className="stat-label">Success Rate</span>
             </div>
             <div className="stat-item">
-              <span className="stat-number">4.9</span>
+              <span className="stat-number">{volunteerData.rating || "0.0"}</span>
               <span className="stat-label">Rating</span>
             </div>
           </div>

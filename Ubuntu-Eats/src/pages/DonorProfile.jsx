@@ -1,28 +1,33 @@
 // DonorProfile.jsx
 import React, { useState, useEffect } from "react";
 import "../styles/DonorProfile.css";
-import { db } from "../../firebaseConfig";
+import { db, auth } from "../../firebaseConfig";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { auth } from "../../firebaseConfig";
+import { useNavigate } from "react-router-dom";
 
 const DonorProfile = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [donorData, setDonorData] = useState(null);
   const [formData, setFormData] = useState({});
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchDonorData = async () => {
       try {
         const user = auth.currentUser;
         if (user) {
-          const docRef = doc(db, "donors", user.uid);
+          const docRef = doc(db, "users", user.email);
           const docSnap = await getDoc(docRef);
 
           if (docSnap.exists()) {
             const data = docSnap.data();
-            setDonorData(data);
-            setFormData(data);
+            if (data.role === "individual" || data.role === "company") {
+              setDonorData(data);
+              setFormData(data);
+            } else {
+              console.warn("This user is not a donor.");
+            }
           } else {
             console.log("No such document!");
           }
@@ -39,10 +44,7 @@ const DonorProfile = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSave = async (e) => {
@@ -50,7 +52,7 @@ const DonorProfile = () => {
     try {
       const user = auth.currentUser;
       if (user) {
-        const docRef = doc(db, "donors", user.uid);
+        const docRef = doc(db, "users", user.email);
         await updateDoc(docRef, formData);
         setDonorData(formData);
         setIsEditing(false);
@@ -65,65 +67,59 @@ const DonorProfile = () => {
     setIsEditing(false);
   };
 
-  if (loading) {
-    return <div className="profile-loading">Loading profile...</div>;
-  }
+  // Logout function
+  const handleLogout = async () => {
+    try {
+      await auth.signOut();
+      navigate("/"); // redirect to landing page
+    } catch (error) {
+      console.error("Error logging out:", error);
+    }
+  };
 
-  if (!donorData) {
-    return <div className="profile-error">Error loading profile data.</div>;
-  }
+  if (loading) return <div className="profile-loading">Loading profile...</div>;
+  if (!donorData) return <div className="profile-error">Error loading profile data.</div>;
+
+  const isCompany = donorData.role === "company";
 
   return (
     <div className="profile-section">
       <div className="profile-header">
-        <div className="profile-avatar">
-          <span className="avatar-text">
-            {donorData.donorType === "company"
-              ? donorData.companyName?.charAt(0) || "C"
-              : donorData.fullName?.charAt(0) || "U"}
-          </span>
-        </div>
-        <div className="profile-info">
-          <h2>
-            {donorData.donorType === "company"
-              ? donorData.companyName
-              : donorData.fullName}
-          </h2>
-          <span className="donor-type">
-            {donorData.donorType === "company"
-              ? "Business Account"
-              : "Individual Donor"}
-          </span>
-          {donorData.verified ? (
-            <span className="verification-badge verified">Verified</span>
-          ) : (
-            <span className="verification-badge pending">
-              Verification Pending
-            </span>
-          )}
-        </div>
-        <button
-          className="edit-btn"
-          onClick={() => setIsEditing(true)}
-          disabled={isEditing}
-        >
-          Edit Profile
-        </button>
-      </div>
+  <div className="avatar-logout-wrapper">
+    <div className="profile-avatar">
+      <span className="avatar-text">
+        {isCompany ? donorData.companyName?.charAt(0) || "C" : donorData.name?.charAt(0) || "U"}
+      </span>
+    </div>
+    <button className="logout-btn" onClick={handleLogout}>
+      Logout
+    </button>
+  </div>
+
+  <div className="profile-info">
+    <h2>{isCompany ? donorData.companyName : donorData.name}</h2>
+    <span className="donor-type">{isCompany ? "Business Account" : "Individual Donor"}</span>
+    {donorData.status === "verified" ? (
+      <span className="verification-badge verified">Verified</span>
+    ) : (
+      <span className="verification-badge pending">Verification Pending</span>
+    )}
+  </div>
+
+  <button className="edit-btn" onClick={() => setIsEditing(true)} disabled={isEditing}>
+    Edit Profile
+  </button>
+</div>
+
 
       <form className="profile-form" onSubmit={handleSave}>
         <div className="form-grid">
           <div className="form-group">
-            <label htmlFor="fullName">
-              {donorData.donorType === "company"
-                ? "Contact Person Name"
-                : "Full Name"}
-            </label>
+            <label>{isCompany ? "Contact Person Name" : "Full Name"}</label>
             <input
               type="text"
-              id="fullName"
-              name="fullName"
-              value={formData.fullName || ""}
+              name="name"
+              value={formData.name || ""}
               onChange={handleInputChange}
               disabled={!isEditing}
               required
@@ -131,23 +127,20 @@ const DonorProfile = () => {
           </div>
 
           <div className="form-group">
-            <label htmlFor="email">Email Address</label>
+            <label>Email Address</label>
             <input
               type="email"
-              id="email"
               name="email"
               value={formData.email || ""}
               onChange={handleInputChange}
-              disabled={!isEditing}
-              required
+              disabled
             />
           </div>
 
           <div className="form-group">
-            <label htmlFor="phone">Phone Number</label>
+            <label>Phone Number</label>
             <input
               type="tel"
-              id="phone"
               name="phone"
               value={formData.phone || ""}
               onChange={handleInputChange}
@@ -157,10 +150,9 @@ const DonorProfile = () => {
           </div>
 
           <div className="form-group">
-            <label htmlFor="country">Country</label>
+            <label>Country</label>
             <input
               type="text"
-              id="country"
               name="country"
               value={formData.country || ""}
               onChange={handleInputChange}
@@ -169,13 +161,24 @@ const DonorProfile = () => {
             />
           </div>
 
-          {donorData.donorType === "company" && (
+          <div className="form-group">
+            <label>Address</label>
+            <input
+              type="text"
+              name="address"
+              value={formData.address || ""}
+              onChange={handleInputChange}
+              disabled={!isEditing}
+              required
+            />
+          </div>
+
+          {isCompany && (
             <>
               <div className="form-group">
-                <label htmlFor="companyName">Company Name</label>
+                <label>Company Name</label>
                 <input
                   type="text"
-                  id="companyName"
                   name="companyName"
                   value={formData.companyName || ""}
                   onChange={handleInputChange}
@@ -183,12 +186,10 @@ const DonorProfile = () => {
                   required
                 />
               </div>
-
               <div className="form-group">
-                <label htmlFor="companyRegNumber">Registration Number</label>
+                <label>Registration Number</label>
                 <input
                   type="text"
-                  id="companyRegNumber"
                   name="companyRegNumber"
                   value={formData.companyRegNumber || ""}
                   onChange={handleInputChange}
@@ -196,12 +197,10 @@ const DonorProfile = () => {
                   required
                 />
               </div>
-
               <div className="form-group">
-                <label htmlFor="companyWebsite">Website</label>
+                <label>Website</label>
                 <input
                   type="url"
-                  id="companyWebsite"
                   name="companyWebsite"
                   value={formData.companyWebsite || ""}
                   onChange={handleInputChange}
@@ -211,12 +210,11 @@ const DonorProfile = () => {
             </>
           )}
 
-          {donorData.donorType === "individual" && (
+          {!isCompany && (
             <div className="form-group">
-              <label htmlFor="idNumber">ID/Passport Number</label>
+              <label>ID / Passport Number</label>
               <input
                 type="text"
-                id="idNumber"
                 name="idNumber"
                 value={formData.idNumber || ""}
                 onChange={handleInputChange}
@@ -225,40 +223,6 @@ const DonorProfile = () => {
               />
             </div>
           )}
-
-          <div className="form-group full-width">
-            <label htmlFor="address">Address</label>
-            <textarea
-              id="address"
-              name="address"
-              value={formData.address || ""}
-              onChange={handleInputChange}
-              disabled={!isEditing}
-              rows="3"
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="preferredDonationType">
-              Preferred Donation Type
-            </label>
-            <select
-              id="preferredDonationType"
-              name="preferredDonationType"
-              value={formData.preferredDonationType || ""}
-              onChange={handleInputChange}
-              disabled={!isEditing}
-              required
-            >
-              <option value="">Select donation type</option>
-              <option value="monetary">Monetary</option>
-              <option value="food">Food</option>
-              <option value="clothes">Clothes</option>
-              <option value="services">Services</option>
-              <option value="other">Other</option>
-            </select>
-          </div>
         </div>
 
         {isEditing && (
@@ -272,28 +236,6 @@ const DonorProfile = () => {
           </div>
         )}
       </form>
-
-      <div className="profile-stats">
-        <h3>Your Impact</h3>
-        <div className="stats-grid">
-          <div className="stat-item">
-            <span className="stat-value">0</span>
-            <span className="stat-desc">Total Donations</span>
-          </div>
-          <div className="stat-item">
-            <span className="stat-value">0</span>
-            <span className="stat-desc">Meals Provided</span>
-          </div>
-          <div className="stat-item">
-            <span className="stat-value">0%</span>
-            <span className="stat-desc">Pickup Success Rate</span>
-          </div>
-          <div className="stat-item">
-            <span className="stat-value">0</span>
-            <span className="stat-desc">Average Rating</span>
-          </div>
-        </div>
-      </div>
     </div>
   );
 };
