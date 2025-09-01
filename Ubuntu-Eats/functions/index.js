@@ -322,12 +322,19 @@ exports.updateDonationStatus = functions.https.onRequest(corsWrapper(async (req,
       });
     }
 
-    // Valid statuses
-    const validStatuses = ['UNCLAIMED', 'PENDING_PICKUP', 'COMPLETED', 'CANCELLED'];
-    if (!validStatuses.includes(status)) {
+    // Valid statuses with better organization
+    const validStatuses = {
+      'UNCLAIMED': { displayName: 'Pending Pickup', allowedFrom: [] },
+      'PENDING_PICKUP': { displayName: 'Pending Pickup', allowedFrom: ['UNCLAIMED'] },
+      'IN_TRANSIT': { displayName: 'In Transit', allowedFrom: ['UNCLAIMED', 'PENDING_PICKUP'] },
+      'COMPLETED': { displayName: 'Completed', allowedFrom: ['IN_TRANSIT'] },
+      'CANCELLED': { displayName: 'Cancelled', allowedFrom: ['UNCLAIMED', 'PENDING_PICKUP'] }
+    };
+
+    if (!validStatuses[status]) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid status. Valid statuses: ' + validStatuses.join(', ')
+        message: 'Invalid status. Valid statuses: ' + Object.keys(validStatuses).join(', ')
       });
     }
 
@@ -342,6 +349,8 @@ exports.updateDonationStatus = functions.https.onRequest(corsWrapper(async (req,
     }
 
     const listingData = listingDoc.data();
+    
+    // Verify the listing belongs to the authenticated user
     if (listingData.donorId !== user.uid) {
       return res.status(403).json({
         success: false,
@@ -349,18 +358,64 @@ exports.updateDonationStatus = functions.https.onRequest(corsWrapper(async (req,
       });
     }
 
-    await listingRef.update({
+    // Check if the status transition is valid
+    const currentStatus = listingData.listingStatus;
+    const newStatusConfig = validStatuses[status];
+    
+    // Allow any status change if coming from the same status (refresh case) or if no restrictions
+    const canChangeStatus = currentStatus === status || 
+                           newStatusConfig.allowedFrom.length === 0 || 
+                           newStatusConfig.allowedFrom.includes(currentStatus);
+
+    if (!canChangeStatus) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot change status from ${currentStatus} to ${status}. Allowed transitions: ${newStatusConfig.allowedFrom.join(', ')} → ${status}`
+      });
+    }
+
+    // Update the listing with new status and timestamp
+    const updateData = {
       listingStatus: status,
       updatedAt: admin.firestore.Timestamp.now()
-    });
+    };
 
-    console.log(`Updated listing ${listingID} status to: ${status}`);
+    // Add specific timestamps for certain status changes
+    if (status === 'IN_TRANSIT') {
+      updateData.pickedUpAt = admin.firestore.Timestamp.now();
+    } else if (status === 'COMPLETED') {
+      updateData.completedAt = admin.firestore.Timestamp.now();
+    } else if (status === 'CANCELLED') {
+      updateData.cancelledAt = admin.firestore.Timestamp.now();
+    }
+
+    await listingRef.update(updateData);
+
+    console.log(`Updated listing ${listingID} status from ${currentStatus} to ${status} by user ${user.uid}`);
+
+    // Return updated listing data
+    const updatedDoc = await listingRef.get();
+    const updatedData = updatedDoc.data();
 
     return res.status(200).json({
       success: true,
       listingID: listingID,
+      previousStatus: currentStatus,
       newStatus: status,
-      message: "Status updated successfully"
+      displayName: newStatusConfig.displayName,
+      updatedAt: updatedData.updatedAt?.toDate()?.toISOString(),
+      message: "Status updated successfully",
+      data: {
+        ...updatedData,
+        // Convert timestamps to ISO strings for easier frontend handling
+        dateListed: updatedData.dateListed?.toDate()?.toISOString(),
+        collectBy: updatedData.collectBy?.toDate()?.toISOString(),
+        createdAt: updatedData.createdAt?.toDate()?.toISOString(),
+        updatedAt: updatedData.updatedAt?.toDate()?.toISOString(),
+        pickedUpAt: updatedData.pickedUpAt?.toDate()?.toISOString(),
+        completedAt: updatedData.completedAt?.toDate()?.toISOString(),
+        cancelledAt: updatedData.cancelledAt?.toDate()?.toISOString()
+      }
     });
 
   } catch (error) {
@@ -376,6 +431,99 @@ exports.updateDonationStatus = functions.https.onRequest(corsWrapper(async (req,
     return res.status(500).json({
       success: false,
       message: `Failed to update donation status: ${error.message}`
+    });
+  }
+}));
+
+
+exports.getDonorDonations = functions.https.onRequest(corsWrapper(async (req, res) => {
+  try {
+    // Only allow GET and POST requests
+    if (req.method !== 'GET' && req.method !== 'POST') {
+      return res.status(405).json({
+        success: false,
+        message: 'Method not allowed. Use GET or POST.'
+      });
+    }
+
+    // Verify user authentication
+    const user = await verifyAuth(req);
+    console.log('Getting donations for user:', user.uid);
+
+    const {
+      status,
+      limit = 50
+    } = req.method === 'GET' ? req.query : req.body;
+
+    // Build query for user's donations - simplified to avoid index requirements
+    let query = admin.firestore()
+      .collection('foodListings')
+      .where('donorId', '==', user.uid);
+
+    // Filter by status if specified
+    if (status && status !== 'all') {
+      query = query.where('listingStatus', '==', status);
+    }
+
+    // Apply limit
+    const queryLimit = Math.min(parseInt(limit) || 50, 100);
+    query = query.limit(queryLimit);
+
+    // Execute query
+    const querySnapshot = await query.get();
+
+    // Process results and sort in memory
+    const donations = [];
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      
+      const donation = {
+        id: doc.id,
+        ...data,
+        dateListed: data.dateListed?.toDate()?.toISOString() || null,
+        collectBy: data.collectBy?.toDate()?.toISOString() || null,
+        createdAt: data.createdAt?.toDate()?.toISOString() || null,
+        updatedAt: data.updatedAt?.toDate()?.toISOString() || null,
+        pickedUpAt: data.pickedUpAt?.toDate()?.toISOString() || null,
+        completedAt: data.completedAt?.toDate()?.toISOString() || null,
+        cancelledAt: data.cancelledAt?.toDate()?.toISOString() || null
+      };
+
+      donations.push(donation);
+    });
+
+    // Sort by dateListed in memory (newest first)
+    donations.sort((a, b) => {
+      const dateA = new Date(a.dateListed || 0);
+      const dateB = new Date(b.dateListed || 0);
+      return dateB - dateA;
+    });
+
+    console.log(`Found ${donations.length} donations for user ${user.uid}`);
+
+    return res.status(200).json({
+      success: true,
+      count: donations.length,
+      donations: donations,
+      filters: {
+        status: status || 'all',
+        limit: queryLimit
+      }
+    });
+
+  } catch (error) {
+    console.error("Error getting user donations:", error);
+    
+    if (error.message.includes('authorization') || error.message.includes('authentication')) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
+    
+    return res.status(500).json({
+      success: false,
+      message: `Failed to get user donations: ${error.message}`
     });
   }
 }));
