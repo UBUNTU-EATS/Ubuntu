@@ -17,11 +17,9 @@ import NGOProfile from "./pages/NGOProfile";
 import ClaimedDonations from "./pages/ClaimedDonations";
 import FoodReceiver from "./pages/FoodReceiver";
 
-import VolunteerDashboard from "./pages/VolunteerDashboard";
-import UnifiedSignup from "./pages/UnifiedSignup";
-import VolunteerProfile from "./pages/VolunteerProfile";
-import MyDeliveries from "./pages/MyDeliveries";
-import AvailableDeliveries from "./pages/AvailableDeliveries";
+import FarmersDashboard from './pages/FarmersDashboard';
+import IssuesPage from './pages/IssuePage';
+
 
 function App() {
   return (
@@ -32,6 +30,11 @@ function App() {
         <Route path="/AuthContainer" element={<AuthContainer />} />
         <Route path="/NGODashboard" element={<NGODashboard />} />
         <Route path="/FoodReceiver" element={<FoodReceiver />} />
+        <Route path="/farmers-dashboard" element={<FarmersDashboard />} />
+        <Route path="/available-listings-farmers" element={<IssuesPage />} />
+
+
+
 
         <Route path="/NGOProfile" element={<NGOProfile />} />
         <Route path="/ClaimedDonations" element={<ClaimedDonations />} />
