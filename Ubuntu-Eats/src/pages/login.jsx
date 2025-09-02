@@ -12,14 +12,17 @@ const Login = ({ isActive, onNoAccountClick }) => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
     setLoading(true);
 
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
       const user = userCredential.user;
 
       const userRef = doc(db, "users", email);
@@ -29,8 +32,10 @@ const Login = ({ isActive, onNoAccountClick }) => {
         const userData = userSnap.data();
         const role = userData.role;
 
-        if (role === "individual" || role === "company" || role === "farmer") {
+        if (role === "individual" || role === "company") {
           navigate("/donor-dashboard");
+        } else if (role === "farmer") {
+          navigate("/farmers-dashboard");
         } else if (role === "volunteer") {
           navigate("/VolunteerDashboard");
         } else if (role === "ngo") {
@@ -76,20 +81,18 @@ const Login = ({ isActive, onNoAccountClick }) => {
         </button>
       </form>
 
-      
-<p className="no-account">
-  Don’t have an account?{" "}
-  <a
-    href="#"
-    onClick={(e) => {
-      e.preventDefault();
-      onNoAccountClick(); // triggers parent to switch form
-    }}
-  >
-    Sign Up
-  </a>
-</p>
-
+      <p className="no-account">
+        Don’t have an account?{" "}
+        <a
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            onNoAccountClick(); // triggers parent to switch form
+          }}
+        >
+          Sign Up
+        </a>
+      </p>
     </section>
   );
 };
