@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from "react";
 import "../styles/ClaimedDonations.css";
+import { auth } from "../../firebaseConfig";
+import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
+import { db } from "../../firebaseConfig";
 
 const ClaimedDonations = ({
   donations,
@@ -13,6 +16,18 @@ const ClaimedDonations = ({
     []
   );
   const [selectedDonation, setSelectedDonation] = useState(null);
+
+  // Chat functionality states
+  const [chatModal, setChatModal] = useState({ open: false, donation: null });
+  const [donorData, setDonorData] = useState(null);
+  const [loadingDonor, setLoadingDonor] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState("");
+  const [chatRoomId, setChatRoomId] = useState(null);
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [messageCache, setMessageCache] = useState(new Map());
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [userCache, setUserCache] = useState(new Map());
 
   // Timer effect to check for volunteer timeout
   useEffect(() => {
@@ -190,6 +205,380 @@ const ClaimedDonations = ({
     }
   };
 
+  // Firebase Functions base URL
+  const FUNCTIONS_BASE_URL =
+    "https://us-central1-ubuntu-eats.cloudfunctions.net";
+
+  // Helper function to make authenticated HTTP requests
+  const makeAuthenticatedRequest = async (endpoint, data = null) => {
+    const user = auth.currentUser;
+    if (!user) throw new Error("User not authenticated");
+
+    const token = await user.getIdToken();
+    const response = await fetch(`${FUNCTIONS_BASE_URL}/${endpoint}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(
+        errorData.message || `HTTP error! status: ${response.status}`
+      );
+    }
+    return await response.json();
+  };
+
+  // User cache management functions
+  const getCachedUser = (userEmail) => {
+    return userCache.get(userEmail) || null;
+  };
+
+  const setCachedUser = (userEmail, userData) => {
+    setUserCache((prev) => new Map(prev).set(userEmail, userData));
+  };
+
+  // Fetch donor data
+  const fetchDonorData = async (donorEmail) => {
+    if (!donorEmail) return;
+
+    // Check cache first - instant load
+    const cachedUser = getCachedUser(donorEmail);
+    if (cachedUser) {
+      setDonorData(cachedUser);
+      setLoadingDonor(false);
+    } else {
+      setLoadingDonor(true);
+    }
+
+    try {
+      // Always fetch fresh data in background to keep cache updated
+      const result = await makeAuthenticatedRequest("getUserData", {
+        userEmail: donorEmail,
+      });
+
+      if (result.success) {
+        // Update cache with fresh data
+        setCachedUser(donorEmail, result.user);
+        setDonorData(result.user);
+      }
+    } catch (error) {
+      console.error("Error fetching donor data:", error);
+      // If we have cached data and fresh fetch fails, keep using cached data
+      if (!cachedUser) {
+        setDonorData(null);
+      }
+    } finally {
+      setLoadingDonor(false);
+    }
+  };
+
+  // Message date formatting functions
+  const formatMessageDate = (timestamp) => {
+    if (!timestamp) return null;
+
+    let date;
+    if (timestamp?.toDate && typeof timestamp.toDate === "function") {
+      date = timestamp.toDate();
+    } else if (timestamp?.seconds) {
+      date = new Date(timestamp.seconds * 1000);
+    } else if (typeof timestamp === "number") {
+      date = new Date(timestamp);
+    } else {
+      return null;
+    }
+
+    return date;
+  };
+
+  const getDateString = (date) => {
+    if (!date) return "";
+
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    // Reset time to compare just dates
+    const messageDate = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate()
+    );
+    const todayDate = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate()
+    );
+    const yesterdayDate = new Date(
+      yesterday.getFullYear(),
+      yesterday.getMonth(),
+      yesterday.getDate()
+    );
+
+    if (messageDate.getTime() === todayDate.getTime()) {
+      return "Today";
+    } else if (messageDate.getTime() === yesterdayDate.getTime()) {
+      return "Yesterday";
+    } else {
+      return date.toLocaleDateString("en-ZA", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year:
+          date.getFullYear() !== today.getFullYear() ? "numeric" : undefined,
+      });
+    }
+  };
+
+  const shouldShowDateSeparator = (currentMessage, previousMessage) => {
+    if (!previousMessage) return true; // Always show for first message
+
+    const currentDate = formatMessageDate(currentMessage.timestamp);
+    const previousDate = formatMessageDate(previousMessage.timestamp);
+
+    if (!currentDate || !previousDate) return false;
+
+    // Compare dates (ignoring time)
+    const currentDay = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth(),
+      currentDate.getDate()
+    );
+    const previousDay = new Date(
+      previousDate.getFullYear(),
+      previousDate.getMonth(),
+      previousDate.getDate()
+    );
+
+    return currentDay.getTime() !== previousDay.getTime();
+  };
+
+  // Cache management functions
+  const getCachedMessages = (chatRoomId) => {
+    return messageCache.get(chatRoomId) || [];
+  };
+
+  const setCachedMessages = (chatRoomId, messages) => {
+    setMessageCache((prev) => new Map(prev).set(chatRoomId, messages));
+  };
+
+  const addMessageToCache = (chatRoomId, message) => {
+    setMessageCache((prev) => {
+      const newCache = new Map(prev);
+      const existingMessages = newCache.get(chatRoomId) || [];
+      const updatedMessages = [...existingMessages, message];
+      newCache.set(chatRoomId, updatedMessages);
+      return newCache;
+    });
+  };
+
+  // Open chat modal
+  const openChatModal = async (donation) => {
+    setChatModal({ open: true, donation });
+
+    // Use the correct donor email field
+    const donorEmail = donation.donorEmail || donation.listingCompany;
+    const ngoEmail = auth.currentUser.email;
+    const donationId = donation.listingID || donation.id;
+
+    const calculatedChatRoomId = `${donorEmail.replace(
+      "@",
+      "_"
+    )}_${ngoEmail.replace("@", "_")}_${donationId}`;
+
+    // Load cached messages immediately for instant display
+    const cachedMessages = getCachedMessages(calculatedChatRoomId);
+    setMessages(cachedMessages);
+    setChatRoomId(calculatedChatRoomId);
+
+    // Load cached user data immediately if available
+    const cachedUser = getCachedUser(donorEmail);
+    if (cachedUser) {
+      setDonorData(cachedUser);
+      setLoadingDonor(false);
+    } else {
+      setLoadingDonor(true);
+    }
+
+    if (donorEmail) {
+      // Start fetching user data (will use cache if available)
+      fetchDonorData(donorEmail);
+
+      // Set up real-time listener immediately
+      setupMessageListener(calculatedChatRoomId);
+
+      // Create/get chat room in background
+      try {
+        const result = await makeAuthenticatedRequest("createChatRoom", {
+          donorEmail: donorEmail,
+          ngoEmail: auth.currentUser.email,
+          donationId: donationId,
+        });
+
+        if (result.success && result.chatRoomId !== calculatedChatRoomId) {
+          // If server returns different chatRoomId, update accordingly
+          setChatRoomId(result.chatRoomId);
+          setupMessageListener(result.chatRoomId);
+        }
+      } catch (error) {
+        console.error("Error setting up chat:", error);
+      }
+    }
+  };
+
+  // Close chat modal
+  const closeChatModal = () => {
+    if (chatModal.unsubscribe) {
+      chatModal.unsubscribe();
+    }
+    setChatModal({ open: false, donation: null });
+    setDonorData(null);
+    setMessages([]);
+    setChatRoomId(null);
+    setNewMessage("");
+  };
+
+  // Setup message listener
+  const setupMessageListener = (roomId) => {
+    const messagesRef = collection(db, "chatRooms", roomId, "messages");
+    const q = query(messagesRef, orderBy("timestamp", "asc"));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const firebaseMessages = [];
+      snapshot.forEach((doc) => {
+        firebaseMessages.push({
+          id: doc.id,
+          ...doc.data(),
+          isOptimistic: false,
+        });
+      });
+
+      // Update cache with latest messages
+      setCachedMessages(roomId, firebaseMessages);
+
+      // Merge with optimistic messages and remove duplicates
+      setMessages((prevMessages) => {
+        const optimisticMessages = prevMessages.filter(
+          (msg) =>
+            msg.isOptimistic &&
+            !firebaseMessages.some((fbMsg) => {
+              const isSameMessage =
+                fbMsg.text === msg.text &&
+                fbMsg.senderEmail === msg.senderEmail;
+
+              if (!isSameMessage) return false;
+
+              const fbTime = fbMsg.timestamp?.toDate
+                ? fbMsg.timestamp.toDate().getTime()
+                : fbMsg.timestamp?.seconds
+                ? fbMsg.timestamp.seconds * 1000
+                : 0;
+              const optTime =
+                typeof msg.timestamp === "number"
+                  ? msg.timestamp
+                  : msg.timestamp?.seconds
+                  ? msg.timestamp.seconds * 1000
+                  : 0;
+
+              return Math.abs(fbTime - optTime) < 5000;
+            })
+        );
+
+        const allMessages = [...firebaseMessages, ...optimisticMessages];
+        return allMessages.sort((a, b) => {
+          const getTimestampValue = (ts) => {
+            if (!ts) return 0;
+            if (ts?.toDate && typeof ts.toDate === "function") {
+              return ts.toDate().getTime();
+            }
+            if (ts?.seconds) {
+              return ts.seconds * 1000;
+            }
+            if (typeof ts === "number") {
+              return ts;
+            }
+            return 0;
+          };
+
+          const aTime = getTimestampValue(a.timestamp);
+          const bTime = getTimestampValue(b.timestamp);
+          return aTime - bTime;
+        });
+      });
+    });
+
+    setChatModal((prev) => ({ ...prev, unsubscribe }));
+  };
+
+  // Send message
+  const sendMessage = async () => {
+    if (!newMessage.trim() || sendingMessage || !chatRoomId) return;
+
+    const messageText = newMessage.trim();
+    const user = auth.currentUser;
+    const userData = JSON.parse(localStorage.getItem("userData") || "{}");
+
+    const tempId = `temp_${Date.now()}_${Math.random()
+      .toString(36)
+      .substr(2, 9)}`;
+
+    const optimisticMessage = {
+      id: tempId,
+      text: messageText,
+      senderEmail: user.email,
+      senderName: userData.name || user.displayName || "User",
+      senderRole: userData.role || "ngo",
+      timestamp: Date.now(),
+      read: false,
+      isOptimistic: true,
+      status: "sending",
+    };
+
+    setNewMessage("");
+    setMessages((prevMessages) => [...prevMessages, optimisticMessage]);
+    addMessageToCache(chatRoomId, optimisticMessage);
+    setSendingMessage(true);
+
+    try {
+      await makeAuthenticatedRequest("sendMessage", {
+        chatRoomId,
+        message: messageText,
+        senderName: userData.name || user.displayName || "User",
+        senderRole: userData.role || "ngo",
+      });
+
+      setMessages((prevMessages) =>
+        prevMessages.map((msg) =>
+          msg.id === tempId
+            ? { ...msg, status: "sent", isOptimistic: true }
+            : msg
+        )
+      );
+    } catch (error) {
+      console.error("Error sending message:", error);
+
+      setMessages((prevMessages) =>
+        prevMessages.map((msg) =>
+          msg.id === tempId
+            ? { ...msg, status: "failed", isOptimistic: true }
+            : msg
+        )
+      );
+
+      setTimeout(() => {
+        setMessages((prevMessages) =>
+          prevMessages.filter((msg) => msg.id !== tempId)
+        );
+      }, 5000);
+    } finally {
+      setSendingMessage(false);
+    }
+  };
+
   // Calculate statistics for header
   const totalClaims = donations.length;
   const toCollectClaims = donations.filter(
@@ -201,6 +590,29 @@ const ClaimedDonations = ({
 
   return (
     <div className="modern-claimed-donations">
+      {/* Header Section */}
+      <div className="donations-header">
+        <div className="header-main">
+          <h1>My Claimed Donations</h1>
+          <p>Manage your claimed food donations and collection process</p>
+        </div>
+
+        <div className="header-stats">
+          <div className="stat-item">
+            <span className="stat-number">{totalClaims}</span>
+            <span className="stat-label">Total</span>
+          </div>
+          <div className="stat-item">
+            <span className="stat-number">{toCollectClaims}</span>
+            <span className="stat-label">To Collect</span>
+          </div>
+          <div className="stat-item">
+            <span className="stat-number">{collectedClaims}</span>
+            <span className="stat-label">Collected</span>
+          </div>
+        </div>
+      </div>
+
       {/* Controls Section */}
       <div className="donations-controls">
         <div className="filter-section">
@@ -457,6 +869,16 @@ const ClaimedDonations = ({
                     Details
                   </button>
 
+                  {/* Chat Button - Only show for active claims */}
+                  {donation.status === "CLAIMED" && (
+                    <button
+                      className="action-button chat"
+                      onClick={() => openChatModal(donation)}
+                    >
+                      💬 Chat
+                    </button>
+                  )}
+
                   {donation.status === "CLAIMED" && (
                     <>
                       <button
@@ -652,12 +1074,176 @@ const ClaimedDonations = ({
             </div>
 
             <div className="modal-footer">
+              {/* Chat button in modal footer for active claims */}
+              {selectedDonation.status === "CLAIMED" && (
+                <button
+                  className="modal-button chat"
+                  onClick={() => {
+                    openChatModal(selectedDonation);
+                    setSelectedDonation(null);
+                  }}
+                >
+                  💬 Chat with Donor
+                </button>
+              )}
               <button
                 className="modal-button secondary"
                 onClick={() => setSelectedDonation(null)}
               >
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Chat Modal */}
+      {chatModal.open && (
+        <div className="modal-backdrop" onClick={closeChatModal}>
+          <div className="chat-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="chat-header">
+              <div className="chat-title">
+                <h3>💬 Chat with Donor</h3>
+                <p>
+                  {loadingDonor
+                    ? "Loading..."
+                    : donorData
+                    ? `${donorData.name}`
+                    : "Donor"}
+                </p>
+              </div>
+              <button className="close-btn" onClick={closeChatModal}>
+                ✕
+              </button>
+            </div>
+
+            <div className="chat-body">
+              {donorData && (
+                <div className="donor-info">
+                  <div className="donor-avatar">👤</div>
+                  <div className="donor-details">
+                    <h4>{donorData.name}</h4>
+                    <p>DONOR</p>
+                    <p>📧 {donorData.email}</p>
+                    <p>📞 {donorData.phone}</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="chat-messages-container">
+                <div className="messages-list">
+                  {messages.length === 0 ? (
+                    <div className="no-messages">
+                      <div className="no-messages-icon">💬</div>
+                      <p>Start a conversation about this donation</p>
+                    </div>
+                  ) : (
+                    messages.map((message, index) => {
+                      const isOwn =
+                        message.senderEmail === auth.currentUser?.email;
+                      const previousMessage =
+                        index > 0 ? messages[index - 1] : null;
+                      const showDateSeparator = shouldShowDateSeparator(
+                        message,
+                        previousMessage
+                      );
+
+                      // Fix timestamp handling for different formats
+                      const formatTimestamp = (timestamp) => {
+                        if (!timestamp) return "";
+
+                        // Handle Firebase Timestamp objects
+                        if (
+                          timestamp?.toDate &&
+                          typeof timestamp.toDate === "function"
+                        ) {
+                          return timestamp.toDate().toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          });
+                        }
+
+                        // Handle optimistic timestamps (plain seconds)
+                        if (timestamp?.seconds) {
+                          return new Date(
+                            timestamp.seconds * 1000
+                          ).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          });
+                        }
+
+                        // Handle plain number timestamps
+                        if (typeof timestamp === "number") {
+                          return new Date(timestamp).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          });
+                        }
+
+                        return "";
+                      };
+
+                      return (
+                        <React.Fragment key={message.id}>
+                          {/* Date Separator */}
+                          {showDateSeparator && (
+                            <div className="date-separator">
+                              <div className="date-separator-line"></div>
+                              <span className="date-separator-text">
+                                {getDateString(
+                                  formatMessageDate(message.timestamp)
+                                )}
+                              </span>
+                              <div className="date-separator-line"></div>
+                            </div>
+                          )}
+
+                          {/* Message */}
+                          <div
+                            className={`message ${
+                              isOwn ? "own-message" : "other-message"
+                            } ${message.isOptimistic ? "optimistic" : ""}`}
+                          >
+                            <div className="message-content">
+                              <p>{message.text}</p>
+                              <span className="message-time">
+                                {formatTimestamp(message.timestamp)}
+
+                                {/* Add status indicators for own messages */}
+                                {isOwn && message.isOptimistic && (
+                                  <span className="message-status">
+                                    {message.status === "sending" && " ⏳"}
+                                    {message.status === "sent" && " ✓"}
+                                    {message.status === "failed" && " ❌"}
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                        </React.Fragment>
+                      );
+                    })
+                  )}
+                </div>
+
+                <div className="message-input-form">
+                  <input
+                    type="text"
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Type your message..."
+                    onKeyPress={(e) => e.key === "Enter" && sendMessage()}
+                    disabled={sendingMessage}
+                  />
+                  <button
+                    onClick={sendMessage}
+                    disabled={sendingMessage || !newMessage.trim()}
+                  >
+                    {sendingMessage ? "..." : "Send"}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
