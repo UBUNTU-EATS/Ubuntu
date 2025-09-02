@@ -127,11 +127,22 @@ const AvailableDeliveries = ({ deliveries, onAccept, maxDistance }) => {
     }
   };
 
-  const handleQuickAccept = async (claimId) => {
-    setProcessing(claimId);
+  const handleQuickAccept = async (delivery) => {
+    setProcessing(delivery.claimId);
     try {
-      await onAccept(claimId);
-      setSelectedDelivery(null);
+      const success = await onAccept(
+        delivery.claimId,
+        delivery.listingId || delivery.id,
+        delivery.ngoEmail,
+        delivery.ngoName
+      );
+
+      if (success) {
+        setSelectedDelivery(null);
+        alert(
+          "Delivery accepted successfully! It's now in your My Deliveries tab."
+        );
+      }
     } catch (error) {
       console.error("Error accepting delivery:", error);
       alert("Failed to accept delivery. Please try again.");
@@ -308,7 +319,7 @@ const AvailableDeliveries = ({ deliveries, onAccept, maxDistance }) => {
                   </button>
                   <button
                     className="accept-btn"
-                    onClick={() => handleQuickAccept(delivery.claimId)}
+                    onClick={() => handleQuickAccept(delivery)}
                     disabled={processing === delivery.claimId}
                   >
                     {processing === delivery.claimId
@@ -436,7 +447,7 @@ const AvailableDeliveries = ({ deliveries, onAccept, maxDistance }) => {
                 </button>
                 <button
                   className="modal-accept-btn"
-                  onClick={() => handleQuickAccept(selectedDelivery.claimId)}
+                  onClick={() => handleQuickAccept(selectedDelivery)}
                   disabled={processing === selectedDelivery.claimId}
                 >
                   {processing === selectedDelivery.claimId

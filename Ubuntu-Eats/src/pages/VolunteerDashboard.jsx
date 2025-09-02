@@ -90,8 +90,8 @@ const VolunteerDashboard = () => {
 
     // Fetch deliveries assigned to this volunteer
     const myDeliveriesQuery = query(
-      collection(db, "claims"),
-      where("volunteerAssigned", "==", user.email)
+      collection(db, "deliveryAssignments"),
+      where("volunteerEmail", "==", user.email)
     );
 
     const myDeliveriesUnsubscribe = onSnapshot(
@@ -99,26 +99,33 @@ const VolunteerDashboard = () => {
       async (snapshot) => {
         const deliveries = await Promise.all(
           snapshot.docs.map(async (docSnapshot) => {
-            const claimData = {
-              claimId: docSnapshot.id,
+            const deliveryData = {
+              deliveryId: docSnapshot.id,
               ...docSnapshot.data(),
             };
 
             try {
+              // Get the claim data for this delivery
+              const claimDoc = await getDoc(
+                doc(db, "claims", deliveryData.claimId)
+              );
+
               // Get the donation data for this claim
               const donationDoc = await getDoc(
-                doc(db, "foodListings", claimData.listingId)
+                doc(db, "foodListings", deliveryData.listingId)
               );
-              if (donationDoc.exists()) {
+
+              if (claimDoc.exists() && donationDoc.exists()) {
                 return {
-                  ...claimData,
+                  ...deliveryData,
+                  ...claimDoc.data(),
                   ...donationDoc.data(),
                 };
               }
-              return claimData;
+              return deliveryData;
             } catch (error) {
-              console.error("Error fetching donation data:", error);
-              return claimData;
+              console.error("Error fetching claim or donation data:", error);
+              return deliveryData;
             }
           })
         );
@@ -137,7 +144,7 @@ const VolunteerDashboard = () => {
     };
   }, []);
 
-  const acceptDelivery = async (claimId) => {
+  const acceptDelivery = async (claimId, listingId, ngoEmail, ngoName) => {
     try {
       const user = auth.currentUser;
       if (!user) throw new Error("User not authenticated");
@@ -149,7 +156,24 @@ const VolunteerDashboard = () => {
         throw new Error("Claim not found");
       }
 
-      // Update claim with volunteer assignment
+      // Create a delivery assignment document
+      const deliveryAssignment = {
+        claimId: claimId,
+        listingId: listingId,
+        volunteerId: user.uid,
+        volunteerEmail: user.email,
+        volunteerName: volunteerData?.name || user.displayName || "Volunteer",
+        ngoEmail: ngoEmail,
+        ngoName: ngoName,
+        status: "ASSIGNED",
+        assignedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+
+      // Add to deliveryAssignments collection
+      await addDoc(collection(db, "deliveryAssignments"), deliveryAssignment);
+
+      // Update the claim with volunteer assignment
       await updateDoc(claimRef, {
         volunteerAssigned: user.email,
         volunteerAssignedAt: serverTimestamp(),
@@ -157,23 +181,34 @@ const VolunteerDashboard = () => {
       });
 
       console.log("Delivery accepted successfully");
+      return true;
     } catch (error) {
       console.error("Error accepting delivery:", error);
       throw error;
     }
   };
 
-  const confirmDelivery = async (claimId, listingId) => {
+  const confirmDelivery = async (deliveryId, claimId, listingId) => {
     try {
+      const deliveryRef = doc(db, "deliveryAssignments", deliveryId);
       const claimRef = doc(db, "claims", claimId);
       const listingRef = doc(db, "foodListings", listingId);
 
+      // Update delivery status
+      await updateDoc(deliveryRef, {
+        status: "DELIVERED",
+        deliveredAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      // Update claim status
       await updateDoc(claimRef, {
         status: "COLLECTED",
         collectedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
 
+      // Update listing status
       await updateDoc(listingRef, {
         listingStatus: "COLLECTED",
         updatedAt: serverTimestamp(),
@@ -184,10 +219,19 @@ const VolunteerDashboard = () => {
     }
   };
 
-  const cancelDelivery = async (claimId) => {
+  const cancelDelivery = async (deliveryId, claimId) => {
     try {
+      const deliveryRef = doc(db, "deliveryAssignments", deliveryId);
       const claimRef = doc(db, "claims", claimId);
 
+      // Delete the delivery assignment
+      await updateDoc(deliveryRef, {
+        status: "CANCELLED",
+        cancelledAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      // Remove volunteer assignment from claim
       await updateDoc(claimRef, {
         volunteerAssigned: null,
         volunteerAssignedAt: null,
@@ -224,7 +268,7 @@ const VolunteerDashboard = () => {
           </div>
           <div className="stat-card">
             <span className="stat-number">
-              {myDeliveries.filter((d) => d.status === "COLLECTED").length}
+              {myDeliveries.filter((d) => d.status === "DELIVERED").length}
             </span>
             <span className="stat-label">Completed</span>
           </div>

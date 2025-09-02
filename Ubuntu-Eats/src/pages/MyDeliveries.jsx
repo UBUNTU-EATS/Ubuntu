@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import "../styles/MyDeliveries.css";
 
 const MyDeliveries = ({ deliveries, onConfirmDelivery, onCancelDelivery }) => {
-  const [activeFilter, setActiveFilter] = useState("CLAIMED");
+  const [activeFilter, setActiveFilter] = useState("ASSIGNED");
   const [processing, setProcessing] = useState(null);
 
   const filteredDeliveries = deliveries.filter((delivery) => {
@@ -23,9 +23,9 @@ const MyDeliveries = ({ deliveries, onConfirmDelivery, onCancelDelivery }) => {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case "CLAIMED":
+      case "ASSIGNED":
         return "status-accepted";
-      case "COLLECTED":
+      case "DELIVERED":
         return "status-delivered";
       case "CANCELLED":
         return "status-cancelled";
@@ -36,9 +36,9 @@ const MyDeliveries = ({ deliveries, onConfirmDelivery, onCancelDelivery }) => {
 
   const getStatusText = (status) => {
     switch (status) {
-      case "CLAIMED":
+      case "ASSIGNED":
         return "In Progress";
-      case "COLLECTED":
+      case "DELIVERED":
         return "Delivered";
       case "CANCELLED":
         return "Cancelled";
@@ -78,23 +78,25 @@ const MyDeliveries = ({ deliveries, onConfirmDelivery, onCancelDelivery }) => {
     return "normal";
   };
 
-  const handleConfirmDelivery = async (claimId, listingId) => {
-    setProcessing(claimId);
+  const handleConfirmDelivery = async (deliveryId, claimId, listingId) => {
+    setProcessing(deliveryId);
     try {
-      await onConfirmDelivery(claimId, listingId);
+      await onConfirmDelivery(deliveryId, claimId, listingId);
     } catch (error) {
       console.error("Error confirming delivery:", error);
+      alert("Failed to confirm delivery. Please try again.");
     } finally {
       setProcessing(null);
     }
   };
 
-  const handleCancelDelivery = async (claimId) => {
-    setProcessing(claimId);
+  const handleCancelDelivery = async (deliveryId, claimId) => {
+    setProcessing(deliveryId);
     try {
-      await onCancelDelivery(claimId);
+      await onCancelDelivery(deliveryId, claimId);
     } catch (error) {
       console.error("Error canceling delivery:", error);
+      alert("Failed to cancel delivery. Please try again.");
     } finally {
       setProcessing(null);
     }
@@ -116,18 +118,20 @@ const MyDeliveries = ({ deliveries, onConfirmDelivery, onCancelDelivery }) => {
           All Deliveries ({deliveries.length})
         </button>
         <button
-          className={`filter-tab ${activeFilter === "CLAIMED" ? "active" : ""}`}
-          onClick={() => setActiveFilter("CLAIMED")}
+          className={`filter-tab ${
+            activeFilter === "ASSIGNED" ? "active" : ""
+          }`}
+          onClick={() => setActiveFilter("ASSIGNED")}
         >
-          Active ({deliveries.filter((d) => d.status === "CLAIMED").length})
+          Active ({deliveries.filter((d) => d.status === "ASSIGNED").length})
         </button>
         <button
           className={`filter-tab ${
-            activeFilter === "COLLECTED" ? "active" : ""
+            activeFilter === "DELIVERED" ? "active" : ""
           }`}
-          onClick={() => setActiveFilter("COLLECTED")}
+          onClick={() => setActiveFilter("DELIVERED")}
         >
-          Completed ({deliveries.filter((d) => d.status === "COLLECTED").length}
+          Completed ({deliveries.filter((d) => d.status === "DELIVERED").length}
           )
         </button>
       </div>
@@ -148,12 +152,12 @@ const MyDeliveries = ({ deliveries, onConfirmDelivery, onCancelDelivery }) => {
       ) : (
         <div className="deliveries-list">
           {filteredDeliveries.map((delivery) => (
-            <div key={delivery.claimId} className="delivery-card">
+            <div key={delivery.deliveryId} className="delivery-card">
               <div className="card-header">
                 <div className="delivery-info">
                   <h3>{delivery.foodType}</h3>
                   <span className="accepted-date">
-                    Accepted on {formatDate(delivery.volunteerAssignedAt)}
+                    Accepted on {formatDate(delivery.assignedAt)}
                   </span>
                 </div>
                 <div className="status-section">
@@ -223,7 +227,7 @@ const MyDeliveries = ({ deliveries, onConfirmDelivery, onCancelDelivery }) => {
                   )}
                 </div>
 
-                {delivery.status === "CLAIMED" && (
+                {delivery.status === "ASSIGNED" && (
                   <div className="delivery-progress">
                     <div className="progress-steps">
                       <div className="progress-step active">
@@ -244,7 +248,7 @@ const MyDeliveries = ({ deliveries, onConfirmDelivery, onCancelDelivery }) => {
                   </div>
                 )}
 
-                {delivery.status === "COLLECTED" && delivery.collectedAt && (
+                {delivery.status === "DELIVERED" && delivery.deliveredAt && (
                   <div className="delivery-completed">
                     <div className="completion-info">
                       <span className="completed-icon">✅</span>
@@ -252,7 +256,7 @@ const MyDeliveries = ({ deliveries, onConfirmDelivery, onCancelDelivery }) => {
                         Successfully delivered!
                       </span>
                       <span className="completion-date">
-                        Delivered on {formatDate(delivery.collectedAt)}
+                        Delivered on {formatDate(delivery.deliveredAt)}
                       </span>
                     </div>
                   </div>
@@ -260,32 +264,41 @@ const MyDeliveries = ({ deliveries, onConfirmDelivery, onCancelDelivery }) => {
               </div>
 
               <div className="card-actions">
-                {delivery.status === "CLAIMED" && (
+                {delivery.status === "ASSIGNED" && (
                   <>
                     <button
                       className="action-btn secondary"
-                      onClick={() => handleCancelDelivery(delivery.claimId)}
-                      disabled={processing === delivery.claimId}
+                      onClick={() =>
+                        handleCancelDelivery(
+                          delivery.deliveryId,
+                          delivery.claimId
+                        )
+                      }
+                      disabled={processing === delivery.deliveryId}
                     >
-                      {processing === delivery.claimId
+                      {processing === delivery.deliveryId
                         ? "Canceling..."
                         : "Cancel Delivery"}
                     </button>
                     <button
                       className="action-btn primary"
                       onClick={() =>
-                        handleConfirmDelivery(delivery.claimId, delivery.id)
+                        handleConfirmDelivery(
+                          delivery.deliveryId,
+                          delivery.claimId,
+                          delivery.listingId
+                        )
                       }
-                      disabled={processing === delivery.claimId}
+                      disabled={processing === delivery.deliveryId}
                     >
-                      {processing === delivery.claimId
+                      {processing === delivery.deliveryId
                         ? "Confirming..."
                         : "Confirm Delivery"}
                     </button>
                   </>
                 )}
 
-                {delivery.status === "COLLECTED" && (
+                {delivery.status === "DELIVERED" && (
                   <div className="completion-actions">
                     <button className="action-btn outline">View Details</button>
                     <button className="action-btn outline">
@@ -309,7 +322,7 @@ const MyDeliveries = ({ deliveries, onConfirmDelivery, onCancelDelivery }) => {
           </div>
           <div className="stat-item">
             <span className="stat-number">
-              {deliveries.filter((d) => d.status === "COLLECTED").length}
+              {deliveries.filter((d) => d.status === "DELIVERED").length}
             </span>
             <span className="stat-label">Completed</span>
           </div>
