@@ -15,7 +15,8 @@ import NGOProfile from "./NGOProfile";
 import AvailableDonations from "./AvailableDonations";
 import ClaimedDonations from "./ClaimedDonations";
 import "../styles/NGODashboard.css";
-
+import LoadingDots from "./loading";
+import { useNavigate } from "react-router-dom";
 const NGODashboard = () => {
   const [activeTab, setActiveTab] = useState("available");
   const [ngoData, setNgoData] = useState(null);
@@ -23,89 +24,47 @@ const NGODashboard = () => {
   const [claimedDonations, setClaimedDonations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState("");
-
+  const navigate = useNavigate();
   // Fetch NGO data and donations
   useEffect(() => {
-    const user = auth.currentUser;
-    if (!user) return;
-
-    setUserEmail(user.email);
-
-    // Fetch NGO profile data
-    const fetchNGOData = async () => {
-      try {
-        const userDocRef = doc(db, "users", user.email);
-        const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists()) {
-          setNgoData(userDoc.data());
-        } else {
-          console.error("NGO data not found for email:", user.email);
-        }
-      } catch (error) {
-        console.error("Error fetching NGO data:", error);
+  const fetchNGOData = async () => {
+    try {
+      const user = auth.currentUser;
+      if (!user) {
+        navigate("/"); // Not logged in
+        return;
       }
-    };
 
-    // Fetch available donations (UNCLAIMED status)
-    const availableQuery = query(
-      collection(db, "foodListings"),
-      where("listingStatus", "==", "UNCLAIMED")
-    );
+      const docRef = doc(db, "users", user.email);
+      const docSnap = await getDoc(docRef);
 
-    const availableUnsubscribe = onSnapshot(availableQuery, (snapshot) => {
-      const donations = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setAvailableDonations(donations);
-    });
+      if (!docSnap.exists()) {
+        console.warn("No NGO data found!");
+        navigate("/"); // No document
+        return;
+      }
 
-    // Fetch claimed donations by this NGO
-    const claimedQuery = query(
-      collection(db, "claims"),
-      where("ngoEmail", "==", user.email)
-    );
+      const data = docSnap.data();
 
-    const claimedUnsubscribe = onSnapshot(claimedQuery, async (snapshot) => {
-      const claims = snapshot.docs.map((doc) => ({
-        claimId: doc.id,
-        ...doc.data(),
-      }));
+      if (!data.isRecipient) {
+        console.warn("User is not a recipient!");
+        navigate("/"); 
+        return;
+      }
 
-      // Get the actual donation data for each claim
-      const claimedDonationsData = await Promise.all(
-        claims.map(async (claim) => {
-          try {
-            const donationDoc = await getDoc(
-              doc(db, "foodListings", claim.listingId)
-            );
-            if (donationDoc.exists()) {
-              return {
-                ...claim,
-                ...donationDoc.data(),
-                claimId: claim.claimId,
-              };
-            }
-            return claim;
-          } catch (error) {
-            console.error("Error fetching donation data:", error);
-            return claim;
-          }
-        })
-      );
-
-      setClaimedDonations(claimedDonationsData);
+      setNgoData(data);
+      setUserEmail(user.email);
       setLoading(false);
-    });
+    } catch (error) {
+      console.error("Error fetching NGO data:", error);
+      setLoading(false);
+      navigate("/"); // On error, redirect
+    }
+  };
 
-    fetchNGOData();
+  fetchNGOData();
+}, [navigate]);
 
-    // Cleanup subscriptions
-    return () => {
-      availableUnsubscribe();
-      claimedUnsubscribe();
-    };
-  }, []);
 
   const claimDonation = async (donationId) => {
     try {
@@ -220,9 +179,14 @@ const NGODashboard = () => {
     }
   };
 
-  if (loading) {
-    return <div className="loading">Loading...</div>;
-  }
+if (loading) {
+  return (
+    <section className="loading">
+      <LoadingDots numDots={10} radius={60} speed={0.6} size={20} />
+    </section>
+  );
+}
+
 
   return (
     <div className="ngo-dashboard">
