@@ -9,6 +9,7 @@ import {
   addDoc,
   serverTimestamp,
   getDoc,
+  deleteDoc,
 } from "firebase/firestore";
 import { db, auth } from "../../firebaseConfig";
 import NGOProfile from "./NGOProfile";
@@ -107,7 +108,7 @@ const NGODashboard = () => {
     };
   }, []);
 
-  const claimDonation = async (donationId) => {
+  const claimDonation = async (donationId, collectionMethod) => {
     try {
       const user = auth.currentUser;
       if (!user) throw new Error("User not authenticated");
@@ -131,7 +132,7 @@ const NGODashboard = () => {
           "Unknown NGO";
       }
 
-      // Create claim record
+      // Create claim record - ensure collectionMethod is not undefined
       const claimData = {
         listingId: donationId,
         ngoId: user.uid,
@@ -139,7 +140,7 @@ const NGODashboard = () => {
         ngoName: ngoName,
         claimDate: serverTimestamp(),
         status: "CLAIMED",
-        collectionMethod: "pending",
+        collectionMethod: collectionMethod || "pending", // Default to "pending" if undefined
         volunteerAssigned: null,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -200,13 +201,13 @@ const NGODashboard = () => {
       const claimRef = doc(db, "claims", claimId);
       const listingRef = doc(db, "foodListings", listingId);
 
-      // Update claim status instead of deleting
+      // Update claim status
       await updateDoc(claimRef, {
         status: "CANCELLED",
         updatedAt: serverTimestamp(),
       });
 
-      // Reset donation status
+      // Reset donation status - ensure we're using the correct field names
       await updateDoc(listingRef, {
         listingStatus: "UNCLAIMED",
         claimedBy: null,
