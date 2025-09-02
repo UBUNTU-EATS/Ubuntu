@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, Fragment } from "react";
 import "../styles/ClaimedDonations.css";
 import { auth } from "../../firebaseConfig";
 import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
@@ -19,6 +19,9 @@ const ClaimedDonations = ({
   const [newMessage, setNewMessage] = useState("");
   const [chatRoomId, setChatRoomId] = useState(null);
   const [sendingMessage, setSendingMessage] = useState(false);
+  const [messageCache, setMessageCache] = useState(new Map()); // Cache messages by chatRoomId
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [userCache, setUserCache] = useState(new Map()); // Cache user data by email
 
   const filteredDonations = donations.filter((donation) => {
     if (activeFilter === "all") return true;
@@ -129,50 +132,194 @@ const ClaimedDonations = ({
     return await response.json();
   };
 
+
+  // User cache management functions
+const getCachedUser = (userEmail) => {
+  return userCache.get(userEmail) || null;
+};
+
+const setCachedUser = (userEmail, userData) => {
+  setUserCache(prev => new Map(prev).set(userEmail, userData));
+};
+
   // Fetch donor data
+
   const fetchDonorData = async (donorEmail) => {
-    try {
-      setLoadingDonor(true);
-      const result = await makeAuthenticatedRequest("getUserData", {
-        userEmail: donorEmail,
-      });
-      if (result.success) {
-        setDonorData(result.user);
+  if (!donorEmail) return;
+  
+  // Check cache first - instant load
+  const cachedUser = getCachedUser(donorEmail);
+  if (cachedUser) {
+    setDonorData(cachedUser);
+    setLoadingDonor(false);
+    console.log('Loaded donor data from cache:', cachedUser.name);
+  } else {
+    setLoadingDonor(true);
+  }
+
+  try {
+    // Always fetch fresh data in background to keep cache updated
+    const result = await makeAuthenticatedRequest("getUserData", {
+      userEmail: donorEmail,
+    });
+
+    if (result.success) {
+      // Update cache with fresh data
+      setCachedUser(donorEmail, result.user);
+      setDonorData(result.user);
+      
+      if (!cachedUser) {
+        console.log('Loaded fresh donor data:', result.user.name);
       }
-    } catch (error) {
-      console.error("Error fetching donor data:", error);
-    } finally {
-      setLoadingDonor(false);
     }
+  } catch (error) {
+    console.error("Error fetching donor data:", error);
+    // If we have cached data and fresh fetch fails, keep using cached data
+    if (!cachedUser) {
+      setDonorData(null);
+    }
+  } finally {
+    setLoadingDonor(false);
+  }
+};
+
+
+//  message date formating functions
+
+
+// Helper functions for date formatting
+const formatMessageDate = (timestamp) => {
+  if (!timestamp) return null;
+  
+  let date;
+  if (timestamp?.toDate && typeof timestamp.toDate === 'function') {
+    date = timestamp.toDate();
+  } else if (timestamp?.seconds) {
+    date = new Date(timestamp.seconds * 1000);
+  } else if (typeof timestamp === 'number') {
+    date = new Date(timestamp);
+  } else {
+    return null;
+  }
+  
+  return date;
+};
+
+const getDateString = (date) => {
+  if (!date) return '';
+  
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  
+  // Reset time to compare just dates
+  const messageDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const yesterdayDate = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate());
+  
+  if (messageDate.getTime() === todayDate.getTime()) {
+    return 'Today';
+  } else if (messageDate.getTime() === yesterdayDate.getTime()) {
+    return 'Yesterday';
+  } else {
+    return date.toLocaleDateString('en-ZA', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined
+    });
+  }
+};
+
+const shouldShowDateSeparator = (currentMessage, previousMessage) => {
+  if (!previousMessage) return true; // Always show for first message
+  
+  const currentDate = formatMessageDate(currentMessage.timestamp);
+  const previousDate = formatMessageDate(previousMessage.timestamp);
+  
+  if (!currentDate || !previousDate) return false;
+  
+  // Compare dates (ignoring time)
+  const currentDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+  const previousDay = new Date(previousDate.getFullYear(), previousDate.getMonth(), previousDate.getDate());
+  
+  return currentDay.getTime() !== previousDay.getTime();
+};
+
+
+
+
+  
+  // Cache management functions
+  const getCachedMessages = (chatRoomId) => {
+    return messageCache.get(chatRoomId) || [];
+  };
+
+  const setCachedMessages = (chatRoomId, messages) => {
+    setMessageCache((prev) => new Map(prev).set(chatRoomId, messages));
+  };
+
+  const addMessageToCache = (chatRoomId, message) => {
+    setMessageCache((prev) => {
+      const newCache = new Map(prev);
+      const existingMessages = newCache.get(chatRoomId) || [];
+      const updatedMessages = [...existingMessages, message];
+      newCache.set(chatRoomId, updatedMessages);
+      return newCache;
+    });
   };
 
   // Open chat modal
+
   const openChatModal = async (donation) => {
-    setChatModal({ open: true, donation });
-    setMessages([]);
+  setChatModal({ open: true, donation });
 
-    // Use donorEmail from the donation data
-    const donorEmail = donation.donorEmail || donation.listingCompany; // fallback
+  // Use the correct donor email field - it should be donorEmail, not claimedByEmail
+  const donorEmail = donation.donorEmail || donation.listingCompany; 
+  const ngoEmail = auth.currentUser.email;
+  const donationId = donation.listingID || donation.id;
+  
+  const calculatedChatRoomId = `${donorEmail.replace("@", "_")}_${ngoEmail.replace("@", "_")}_${donationId}`;
 
-    if (donorEmail) {
-      fetchDonorData(donorEmail);
+  // Load cached messages immediately for instant display
+  const cachedMessages = getCachedMessages(calculatedChatRoomId);
+  setMessages(cachedMessages);
+  setChatRoomId(calculatedChatRoomId);
 
-      try {
-        const result = await makeAuthenticatedRequest("createChatRoom", {
-          donorEmail: donorEmail,
-          ngoEmail: auth.currentUser.email,
-          donationId: donation.listingId || donation.id,
-        });
+  // Load cached user data immediately if available
+  const cachedUser = getCachedUser(donorEmail);
+  if (cachedUser) {
+    setDonorData(cachedUser);
+    setLoadingDonor(false);
+  } else {
+    setLoadingDonor(true);
+  }
 
-        if (result.success) {
-          setChatRoomId(result.chatRoomId);
-          setupMessageListener(result.chatRoomId);
-        }
-      } catch (error) {
-        console.error("Error setting up chat:", error);
+  if (donorEmail) {
+    // Start fetching user data (will use cache if available)
+    fetchDonorData(donorEmail);
+
+    // Set up real-time listener immediately
+    setupMessageListener(calculatedChatRoomId);
+
+    // Create/get chat room in background
+    try {
+      const result = await makeAuthenticatedRequest("createChatRoom", {
+        donorEmail: donorEmail,
+        ngoEmail: auth.currentUser.email,
+        donationId: donationId,
+      });
+
+      if (result.success && result.chatRoomId !== calculatedChatRoomId) {
+        // If server returns different chatRoomId, update accordingly
+        setChatRoomId(result.chatRoomId);
+        setupMessageListener(result.chatRoomId);
       }
+    } catch (error) {
+      console.error("Error setting up chat:", error);
     }
-  };
+  }
+};
 
   // Close chat modal
   const closeChatModal = () => {
@@ -192,41 +339,137 @@ const ClaimedDonations = ({
     const q = query(messagesRef, orderBy("timestamp", "asc"));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const messagesList = [];
+      const firebaseMessages = [];
       snapshot.forEach((doc) => {
-        messagesList.push({ id: doc.id, ...doc.data() });
+        firebaseMessages.push({
+          id: doc.id,
+          ...doc.data(),
+          isOptimistic: false,
+        });
       });
-      setMessages(messagesList);
+
+      // Update cache with latest messages
+      setCachedMessages(roomId, firebaseMessages);
+
+      // Merge with optimistic messages and remove duplicates
+      setMessages((prevMessages) => {
+        const optimisticMessages = prevMessages.filter(
+          (msg) =>
+            msg.isOptimistic &&
+            !firebaseMessages.some((fbMsg) => {
+              const isSameMessage =
+                fbMsg.text === msg.text &&
+                fbMsg.senderEmail === msg.senderEmail;
+
+              if (!isSameMessage) return false;
+
+              const fbTime = fbMsg.timestamp?.toDate
+                ? fbMsg.timestamp.toDate().getTime()
+                : fbMsg.timestamp?.seconds
+                ? fbMsg.timestamp.seconds * 1000
+                : 0;
+              const optTime =
+                typeof msg.timestamp === "number"
+                  ? msg.timestamp
+                  : msg.timestamp?.seconds
+                  ? msg.timestamp.seconds * 1000
+                  : 0;
+
+              return Math.abs(fbTime - optTime) < 5000;
+            })
+        );
+
+        const allMessages = [...firebaseMessages, ...optimisticMessages];
+        return allMessages.sort((a, b) => {
+          const getTimestampValue = (ts) => {
+            if (!ts) return 0;
+            if (ts?.toDate && typeof ts.toDate === "function") {
+              return ts.toDate().getTime();
+            }
+            if (ts?.seconds) {
+              return ts.seconds * 1000;
+            }
+            if (typeof ts === "number") {
+              return ts;
+            }
+            return 0;
+          };
+
+          const aTime = getTimestampValue(a.timestamp);
+          const bTime = getTimestampValue(b.timestamp);
+          return aTime - bTime;
+        });
+      });
     });
 
     setChatModal((prev) => ({ ...prev, unsubscribe }));
   };
 
   // Send message
+
+
   const sendMessage = async () => {
-    if (!newMessage.trim() || sendingMessage || !chatRoomId) return;
+  if (!newMessage.trim() || sendingMessage || !chatRoomId) return;
 
-    setSendingMessage(true);
-    try {
-      const user = auth.currentUser;
-      const userData = JSON.parse(localStorage.getItem("userData") || "{}");
+  const messageText = newMessage.trim();
+  const user = auth.currentUser;
+  const userData = JSON.parse(localStorage.getItem("userData") || "{}");
 
-      await makeAuthenticatedRequest("sendMessage", {
-        chatRoomId,
-        message: newMessage.trim(),
-        senderName: userData.name || user.displayName || "NGO User",
-        senderRole: userData.role || "ngo",
-      });
+  const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-      setNewMessage("");
-    } catch (error) {
-      console.error("Error sending message:", error);
-      alert("Failed to send message");
-    } finally {
-      setSendingMessage(false);
-    }
+  const optimisticMessage = {
+    id: tempId,
+    text: messageText,
+    senderEmail: user.email,
+    senderName: userData.name || user.displayName || "User",
+    senderRole: userData.role || "ngo", // Change from "donor" to "ngo"
+    timestamp: Date.now(),
+    read: false,
+    isOptimistic: true,
+    status: "sending",
   };
 
+  setNewMessage("");
+  setMessages((prevMessages) => [...prevMessages, optimisticMessage]);
+  addMessageToCache(chatRoomId, optimisticMessage);
+  setSendingMessage(true);
+
+  try {
+    await makeAuthenticatedRequest("sendMessage", {
+      chatRoomId,
+      message: messageText,
+      senderName: userData.name || user.displayName || "User",
+      senderRole: userData.role || "ngo", // Change from "donor" to "ngo"
+    });
+
+    setMessages((prevMessages) =>
+      prevMessages.map((msg) =>
+        msg.id === tempId
+          ? { ...msg, status: "sent", isOptimistic: true }
+          : msg
+      )
+    );
+  } catch (error) {
+    console.error("Error sending message:", error);
+
+    setMessages((prevMessages) =>
+      prevMessages.map((msg) =>
+        msg.id === tempId
+          ? { ...msg, status: "failed", isOptimistic: true }
+          : msg
+      )
+    );
+
+    setTimeout(() => {
+      setMessages((prevMessages) =>
+        prevMessages.filter((msg) => msg.id !== tempId)
+      );
+    }, 5000);
+  } finally {
+    setSendingMessage(false);
+  }
+};
+  
   return (
     <div className="claimed-donations">
       <div className="section-header">
@@ -491,35 +734,87 @@ const ClaimedDonations = ({
 
               <div className="chat-messages-container">
                 <div className="messages-list">
-                  {messages.length === 0 ? (
-                    <div className="no-messages">
-                      <div className="no-messages-icon">💬</div>
-                      <p>Start a conversation about this donation</p>
-                    </div>
-                  ) : (
-                    messages.map((message) => (
-                      <div
-                        key={message.id}
-                        className={`message ${
-                          message.senderEmail === auth.currentUser?.email
-                            ? "own-message"
-                            : "other-message"
-                        }`}
-                      >
-                        <div className="message-content">
-                          <p>{message.text}</p>
-                          <span className="message-time">
-                            {message.timestamp
-                              ?.toDate()
-                              .toLocaleTimeString([], {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
-                          </span>
-                        </div>
-                      </div>
-                    ))
-                  )}
+               {messages.length === 0 ? (
+  <div className="no-messages">
+    <div className="no-messages-icon">💬</div>
+    <p>Start a conversation about this donation</p>
+  </div>
+) : (
+  messages.map((message, index) => {
+    const isOwn = message.senderEmail === auth.currentUser?.email;
+    const previousMessage = index > 0 ? messages[index - 1] : null;
+    const showDateSeparator = shouldShowDateSeparator(message, previousMessage);
+    
+    // Fix timestamp handling for different formats
+    const formatTimestamp = (timestamp) => {
+      if (!timestamp) return "";
+
+      // Handle Firebase Timestamp objects
+      if (timestamp?.toDate && typeof timestamp.toDate === "function") {
+        return timestamp.toDate().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+      }
+
+      // Handle optimistic timestamps (plain seconds)
+      if (timestamp?.seconds) {
+        return new Date(timestamp.seconds * 1000).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+      }
+
+      // Handle plain number timestamps
+      if (typeof timestamp === "number") {
+        return new Date(timestamp).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+      }
+
+      return "";
+    };
+
+    return (
+      <React.Fragment key={message.id}>
+        {/* Date Separator */}
+        {showDateSeparator && (
+          <div className="date-separator">
+            <div className="date-separator-line"></div>
+            <span className="date-separator-text">
+              {getDateString(formatMessageDate(message.timestamp))}
+            </span>
+            <div className="date-separator-line"></div>
+          </div>
+        )}
+        
+        {/* Message */}
+        <div
+          className={`message ${
+            isOwn ? "own-message" : "other-message"
+          } ${message.isOptimistic ? "optimistic" : ""}`}
+        >
+          <div className="message-content">
+            <p>{message.text}</p>
+            <span className="message-time">
+              {formatTimestamp(message.timestamp)}
+
+              {/* Add status indicators for own messages */}
+              {isOwn && message.isOptimistic && (
+                <span className="message-status">
+                  {message.status === "sending" && " ⏳"}
+                  {message.status === "sent" && " ✓"}
+                  {message.status === "failed" && " ❌"}
+                </span>
+              )}
+            </span>
+          </div>
+        </div>
+      </React.Fragment>
+    );
+  })
+)}
                 </div>
 
                 <div className="message-input-form">
