@@ -1,5 +1,8 @@
 import React, { useState } from "react";
 import "../styles/ClaimedDonations.css";
+import { auth } from "../../firebaseConfig";
+import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
+import { db } from "../../firebaseConfig";
 
 const ClaimedDonations = ({
   donations,
@@ -9,6 +12,13 @@ const ClaimedDonations = ({
 }) => {
   const [activeFilter, setActiveFilter] = useState("all");
   const [processing, setProcessing] = useState(null);
+  const [chatModal, setChatModal] = useState({ open: false, donation: null });
+  const [donorData, setDonorData] = useState(null);
+  const [loadingDonor, setLoadingDonor] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState("");
+  const [chatRoomId, setChatRoomId] = useState(null);
+  const [sendingMessage, setSendingMessage] = useState(false);
 
   const filteredDonations = donations.filter((donation) => {
     if (activeFilter === "all") return true;
@@ -88,6 +98,132 @@ const ClaimedDonations = ({
       console.error("Error canceling claim:", error);
     } finally {
       setProcessing(null);
+    }
+  };
+
+  // Firebase Functions base URL
+  const FUNCTIONS_BASE_URL =
+    "https://us-central1-ubuntu-eats.cloudfunctions.net";
+
+  // Helper function to make authenticated HTTP requests
+  const makeAuthenticatedRequest = async (endpoint, data = null) => {
+    const user = auth.currentUser;
+    if (!user) throw new Error("User not authenticated");
+
+    const token = await user.getIdToken();
+    const response = await fetch(`${FUNCTIONS_BASE_URL}/${endpoint}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(
+        errorData.message || `HTTP error! status: ${response.status}`
+      );
+    }
+    return await response.json();
+  };
+
+  // Fetch donor data
+  const fetchDonorData = async (donorEmail) => {
+    try {
+      setLoadingDonor(true);
+      const result = await makeAuthenticatedRequest("getUserData", {
+        userEmail: donorEmail,
+      });
+      if (result.success) {
+        setDonorData(result.user);
+      }
+    } catch (error) {
+      console.error("Error fetching donor data:", error);
+    } finally {
+      setLoadingDonor(false);
+    }
+  };
+
+  // Open chat modal
+  const openChatModal = async (donation) => {
+    setChatModal({ open: true, donation });
+    setMessages([]);
+
+    // Use donorEmail from the donation data
+    const donorEmail = donation.donorEmail || donation.listingCompany; // fallback
+
+    if (donorEmail) {
+      fetchDonorData(donorEmail);
+
+      try {
+        const result = await makeAuthenticatedRequest("createChatRoom", {
+          donorEmail: donorEmail,
+          ngoEmail: auth.currentUser.email,
+          donationId: donation.listingId || donation.id,
+        });
+
+        if (result.success) {
+          setChatRoomId(result.chatRoomId);
+          setupMessageListener(result.chatRoomId);
+        }
+      } catch (error) {
+        console.error("Error setting up chat:", error);
+      }
+    }
+  };
+
+  // Close chat modal
+  const closeChatModal = () => {
+    if (chatModal.unsubscribe) {
+      chatModal.unsubscribe();
+    }
+    setChatModal({ open: false, donation: null });
+    setDonorData(null);
+    setMessages([]);
+    setChatRoomId(null);
+    setNewMessage("");
+  };
+
+  // Setup message listener
+  const setupMessageListener = (roomId) => {
+    const messagesRef = collection(db, "chatRooms", roomId, "messages");
+    const q = query(messagesRef, orderBy("timestamp", "asc"));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const messagesList = [];
+      snapshot.forEach((doc) => {
+        messagesList.push({ id: doc.id, ...doc.data() });
+      });
+      setMessages(messagesList);
+    });
+
+    setChatModal((prev) => ({ ...prev, unsubscribe }));
+  };
+
+  // Send message
+  const sendMessage = async () => {
+    if (!newMessage.trim() || sendingMessage || !chatRoomId) return;
+
+    setSendingMessage(true);
+    try {
+      const user = auth.currentUser;
+      const userData = JSON.parse(localStorage.getItem("userData") || "{}");
+
+      await makeAuthenticatedRequest("sendMessage", {
+        chatRoomId,
+        message: newMessage.trim(),
+        senderName: userData.name || user.displayName || "NGO User",
+        senderRole: userData.role || "ngo",
+      });
+
+      setNewMessage("");
+    } catch (error) {
+      console.error("Error sending message:", error);
+      alert("Failed to send message");
+    } finally {
+      setSendingMessage(false);
     }
   };
 
@@ -290,6 +426,18 @@ const ClaimedDonations = ({
                           : "Confirm Collection"}
                       </button>
                     )}
+
+                    {donation.status === "CLAIMED" && (
+                      <>
+                        {/* ADD THIS CHAT BUTTON */}
+                        <button
+                          className="action-btn chat-btn"
+                          onClick={() => openChatModal(donation)}
+                        >
+                          💬 Chat with Donor
+                        </button>
+                      </>
+                    )}
                   </>
                 )}
 
@@ -306,6 +454,93 @@ const ClaimedDonations = ({
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {chatModal.open && (
+        <div className="modal-overlay" onClick={closeChatModal}>
+          <div className="chat-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="chat-header">
+              <div className="chat-title">
+                <h3>💬 Chat with Donor</h3>
+                <p>
+                  {loadingDonor
+                    ? "Loading..."
+                    : donorData
+                    ? `${donorData.name}`
+                    : "Donor"}
+                </p>
+              </div>
+              <button className="close-btn" onClick={closeChatModal}>
+                ✕
+              </button>
+            </div>
+
+            <div className="chat-body">
+              {donorData && (
+                <div className="donor-info">
+                  <div className="donor-avatar">👤</div>
+                  <div className="donor-details">
+                    <h4>{donorData.name}</h4>
+                    <p>DONOR</p>
+                    <p>📧 {donorData.email}</p>
+                    <p>📞 {donorData.phone}</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="chat-messages-container">
+                <div className="messages-list">
+                  {messages.length === 0 ? (
+                    <div className="no-messages">
+                      <div className="no-messages-icon">💬</div>
+                      <p>Start a conversation about this donation</p>
+                    </div>
+                  ) : (
+                    messages.map((message) => (
+                      <div
+                        key={message.id}
+                        className={`message ${
+                          message.senderEmail === auth.currentUser?.email
+                            ? "own-message"
+                            : "other-message"
+                        }`}
+                      >
+                        <div className="message-content">
+                          <p>{message.text}</p>
+                          <span className="message-time">
+                            {message.timestamp
+                              ?.toDate()
+                              .toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="message-input-form">
+                  <input
+                    type="text"
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Type your message..."
+                    onKeyPress={(e) => e.key === "Enter" && sendMessage()}
+                    disabled={sendingMessage}
+                  />
+                  <button
+                    onClick={sendMessage}
+                    disabled={sendingMessage || !newMessage.trim()}
+                  >
+                    {sendingMessage ? "..." : "Send"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

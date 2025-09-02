@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import "../styles/AvailableDonations.css";
 
+
 const AvailableDonations = ({ donations, onClaim }) => {
   const [filters, setFilters] = useState({
     category: "all",
@@ -165,10 +166,10 @@ const AvailableDonations = ({ donations, onClaim }) => {
                   <h3>{donation.donorName}</h3>
                   <span className="distance">{donation.distance} km away</span>
                 </div>
-                <div className="category-badge">
-                  {getCategoryIcon(donation.category)}
-                  {donation.category.replace("-", " ")}
-                </div>
+               <div className="category-badge">
+  {getCategoryIcon(donation.category)}
+  {donation.category ? donation.category.replace("-", " ") : "Unknown"}
+</div>
               </div>
 
               <div className="card-content">

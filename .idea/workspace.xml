@@ -5,12 +5,11 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="c929d3d1-30c7-4099-9520-6e977d060e93" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/Ubuntu-Eats/.firebaserc" beforeDir="false" afterPath="$PROJECT_DIR$/Ubuntu-Eats/.firebaserc" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Ubuntu-Eats/firebase.json" beforeDir="false" afterPath="$PROJECT_DIR$/Ubuntu-Eats/firebase.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Ubuntu-Eats/firebaseConfig.ts" beforeDir="false" afterPath="$PROJECT_DIR$/Ubuntu-Eats/firebaseConfig.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Ubuntu-Eats/src/pages/DonorDashboard.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/Ubuntu-Eats/src/pages/DonorDashboard.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Ubuntu-Eats/src/pages/DonorForm.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/Ubuntu-Eats/src/pages/DonorForm.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Ubuntu-Eats/src/pages/DonorProfile.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/Ubuntu-Eats/src/pages/DonorProfile.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Ubuntu-Eats/src/pages/AvailableDonations.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/Ubuntu-Eats/src/pages/AvailableDonations.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Ubuntu-Eats/src/pages/ClaimedDonations.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/Ubuntu-Eats/src/pages/ClaimedDonations.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Ubuntu-Eats/src/styles/ActveDonations.css" beforeDir="false" afterPath="$PROJECT_DIR$/Ubuntu-Eats/src/styles/ActveDonations.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Ubuntu-Eats/src/styles/ClaimedDonations.css" beforeDir="false" afterPath="$PROJECT_DIR$/Ubuntu-Eats/src/styles/ClaimedDonations.css" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -50,6 +49,7 @@
   "keyToString": {
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.git.unshallow": "true",
+    "git-widget-placeholder": "main",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
@@ -73,7 +73,7 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1756716471880</updated>
-      <workItem from="1756716473551" duration="3047000" />
+      <workItem from="1756716473551" duration="4288000" />
     </task>
     <servers />
   </component>
