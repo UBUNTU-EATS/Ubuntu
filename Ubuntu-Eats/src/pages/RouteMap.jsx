@@ -74,70 +74,70 @@ const RouteMap = ({
     return path;
   };
 
+
   const calculateRoute = () => {
-    if (!isLoaded || !origin || !destination) return;
+  if (!isLoaded || !origin || !destination) return;
 
-    setError(null);
-    const directionsService = new window.google.maps.DirectionsService();
-    
-    directionsService.route(
-      {
-        origin: origin,
-        destination: destination,
-        travelMode: window.google.maps.TravelMode.DRIVING,
-        region: 'ZA',
-        unitSystem: window.google.maps.UnitSystem.METRIC,
-      },
-      (result, status) => {
-        if (status === window.google.maps.DirectionsStatus.OK) {
-          setDirections(result);
-          
-          // Extract route information
-          const route = result.routes[0];
-          const leg = route.legs[0];
-          
-          const info = {
-            distance: leg.distance.text,
-            duration: leg.duration.text,
-            isRealRoute: true
-          };
-          
-          setRouteInfo(info);
-          
-          if (onRouteCalculated) {
-            onRouteCalculated(info);
-          }
-          
-          console.log('Real route calculated successfully');
-        } else {
-          console.error(`Directions request failed: ${status}`);
-          setError(`Route calculation failed: ${status}`);
-          
-          // Generate fallback route
-          const roadPath = generateRoadApproximation(origin, destination);
-          setFallbackRoute(roadPath);
-          
-          const straightDistance = calculateDistance(origin, destination);
-          const approxDrivingDistance = (parseFloat(straightDistance) * 1.3).toFixed(1); // Estimate 30% longer for roads
-          
-          const info = {
-            distance: `~${approxDrivingDistance} km`,
-            duration: `~${Math.ceil(approxDrivingDistance * 2)} min`,
-            isRealRoute: false
-          };
-          
-          setRouteInfo(info);
-          
-          if (onRouteCalculated) {
-            onRouteCalculated(info);
-          }
-          
-          console.log('Using fallback route approximation');
-        }
+  setError(null);
+  const directionsService = new window.google.maps.DirectionsService();
+  
+  directionsService.route(
+    {
+      origin: origin,
+      destination: destination,
+      travelMode: window.google.maps.TravelMode.DRIVING,
+      region: 'ZA',
+      unitSystem: window.google.maps.UnitSystem.METRIC,
+      avoidTolls: false,
+      avoidHighways: false
+    },
+    (result, status) => {
+      if (status === window.google.maps.DirectionsStatus.OK) {
+        setDirections(result);
+        
+        const route = result.routes[0];
+        const leg = route.legs[0];
+        
+        const info = {
+          distance: leg.distance.text,
+          duration: leg.duration.text,
+          isRealRoute: true
+        };
+        
+        setRouteInfo(info);
+        if (onRouteCalculated) onRouteCalculated(info);
+        
+        console.log('Real route calculated successfully');
+      } else {
+        console.error(`Directions request failed: ${status}`);
+        
+        // Enhanced fallback with better estimation
+        const straightDistance = calculateDistance(origin, destination);
+        const roadPath = generateRoadApproximation(origin, destination);
+        setFallbackRoute(roadPath);
+        
+        // Better driving distance estimation for South Africa
+        const cityFactor = straightDistance < 10 ? 1.2 : 1.4; // City vs highway
+        const approxDrivingDistance = (parseFloat(straightDistance) * cityFactor).toFixed(1);
+        const approxDuration = Math.ceil(approxDrivingDistance * 1.5); // More realistic time estimate
+        
+        const info = {
+          distance: `~${approxDrivingDistance} km`,
+          duration: `~${approxDuration} min`,
+          isRealRoute: false
+        };
+        
+        setRouteInfo(info);
+        if (onRouteCalculated) onRouteCalculated(info);
+        
+        setError(`Route service unavailable (${status})`);
+        console.log('Using enhanced fallback route approximation');
       }
-    );
-  };
+    }
+  );
+};
 
+  
   useEffect(() => {
     calculateRoute();
   }, [isLoaded, origin, destination]);

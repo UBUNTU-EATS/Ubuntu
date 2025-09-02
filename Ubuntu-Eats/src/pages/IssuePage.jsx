@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from "react";
 import RouteMap from './RouteMap'; // Import the RouteMap component
-// let fetchIssues;
-// let UpdateIssue; 
+let fetchIssues;
+let UpdateIssue; 
 import '../styles/IssuePage.css';
-// let fetchUser
+let fetchUser
 import { FaBars } from 'react-icons/fa';
 import { toast } from "react-toastify";
 import { useNavigate ,Navigate} from "react-router-dom";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "../../firebaseConfig"; // your firebase.js
+
 
 // User's current location (farmer/collector location)
 const userLocation = { lat: -26.2041, lng: 28.0473 }; // Central Johannesburg
@@ -38,114 +41,76 @@ const IssuesPage = () => {
     navigate('/');
   };
 
-  useEffect(() => {
-    const loadIssues = async () => {
-      setIsLoading(true);
-      try {
-        // Enhanced dummy issues with realistic Johannesburg locations
-        const dummyIssues = [
-          {
-            listingID: "1",
-            listingCompany: "KFC Brixton",
-            listingStatus: "UNCLAIMED",
-            priority: "high",
-            dateListed: "20/08/2025",
-            location: "Brixton",
-            coordinates: { lat: -26.2550, lng: 27.9200 }, // Brixton, Johannesburg
-            typeOfFood: "Cooked Meals",
-            reportedAt: new Date().toISOString(),
-          listingDescription: "50kg of cooked chicken pieces, wings and drumsticks. Best before today, safe for animal feed or compost. Available for immediate collection.",
-            reporter: "farmer123",
-            images: [
-              "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=300&q=80",
-              "https://via.placeholder.com/200"
-            ],
-            feedback: "",
-            address: "123 Main Road, Brixton, Johannesburg, 2092"
-          },
-          {
-            listingID: "2",
-            listingCompany: "Shoprite Auckland Park",
-            listingStatus: "CLAIMED",
-            priority: "medium",
-            dateListed: "21/08/2025",
-            location: "Auckland Park",
-            coordinates: { lat: -26.1800, lng: 28.0030 }, 
-            typeOfFood: "Fresh Produce",
-            reportedAt: new Date().toISOString(),
-            listingDescription: "Mixed vegetables including carrots, potatoes, and leafy greens. Slightly past sell-by date but perfect for animal feed or composting.",
-            reporter: "farmer456",
-            images: [
-              "https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=300&q=80"
-            ],
-            address: "45 University Road, Auckland Park, Johannesburg, 2006"
-          },
-          {
-            listingID: "3",
-            listingCompany: "Woolworths Sandton",
-            listingStatus: "UNCLAIMED",
-            priority: "medium",
-            dateListed: "22/08/2025",
-            location: "Sandton",
-            coordinates: { lat: -26.1070, lng: 28.0570 }, 
-            typeOfFood: "Bakery Items",
-            reportedAt: new Date().toISOString(),
-          listingDescription: "Day-old bread, pastries, and baked goods. Perfect for animal feed or can be processed into animal feed supplements.",
-            reporter: "baker789",
-            images: [
-              "https://images.unsplash.com/photo-1549931319-a545dcf3bc73?auto=format&fit=crop&w=300&q=80"
-            ],
-            feedback: "",
-            address: "Sandton City Mall, Sandton, Johannesburg, 2196"
-          },
-          {
 
-            
-            listingID: "4",
-            listingCompany: "Pick n Pay Rosebank",
-            listingStatus: "UNCLAIMED",
-            priority: "high",
-            dateListed: "23/08/2025",
-            location: "Rosebank",
-            coordinates: { lat: -26.1440, lng: 28.0410 }, 
-            typeOfFood: "Dairy Products",
-            reportedAt: new Date().toISOString(),
-          listingDescription: "Expired yogurt and milk products. Can be used for animal feed processing or as fertilizer base after proper treatment.",
-            reporter: "dairy_manager",
-            images: [
-              "https://images.unsplash.com/photo-1563636619-e9143da7973b?auto=format&fit=crop&w=300&q=80"
-            ],
-            feedback: "",
-            address: "The Zone Rosebank, 173 Oxford Rd, Rosebank, Johannesburg, 2196"
-          },
-          {
-            listingID: "5",
-            listingCompany: "Spar Melville",
-            listingStatus: "CLAIMED",
-            priority: "low",
-            dateListed: "24/08/2025",
-            location: "Melville",
-            coordinates: { lat: -26.1890, lng: 28.0170 }, // Melville, Johannesburg
-            typeOfFood: "Mixed Items",
-            reportedAt: new Date().toISOString(),
-          listingDescription: "Various expired canned goods, some damaged packaging but contents still good for animal consumption.",
-            reporter: "store_manager",
-            images: [],
-            feedback: "Collector confirmed pickup for tomorrow morning.",
-            address: "7th Street, Melville, Johannesburg, 2109"
-          }
-        ];
 
-        setIssues(dummyIssues);
-      } catch (error) {
-        console.error("Failed to load issues:", error);
-      } finally {
-        setIsLoading(false);
-      }
+  // Add this function after handleSignOut
+const geocodeListingAddress = async (listing) => {
+  if (listing.coordinates) return listing.coordinates;
+  
+  try {
+    const authToken = localStorage.getItem('authToken');
+    // Replace 'your-project-id' with your actual Firebase project ID
+    const response = await fetch('https://us-central1-ubuntu-eats.cloudfunctions.net/geocodeAddress', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify({ address: listing.address || listing.location })
+    });
+    
+    const result = await response.json();
+    if (result.success && result.coordinates) {
+      return result.coordinates;
+    }
+  } catch (error) {
+    console.warn('Failed to geocode address:', error);
+  }
+  
+  return null;
+};
+
+
+ useEffect(() => {
+  const loadIssues = async () => {
+    setIsLoading(true);
+    try {
+    
+      const colRef = collection(db, "foodListings");
+  
+      const snapshot = await getDocs(colRef);
+
+    
+      const listings = snapshot.docs
+  .map(doc => {
+    const data = doc.data();
+    return {
+      listingID: data.listingID,
+      listingCompany: data.listingCompany,
+      listingStatus: data.listingStatus,
+      typeOfFood: data.typeOfFood,
+      collectBy: data.collectBy?.toDate().toLocaleString(),
+      dateListed: data.dateListed?.toDate().toLocaleDateString(),
+      location: data.location,
+      coordinates: data.coordinates? { lat: data.coordinates.latitude, lng: data.coordinates.longitude }: null,
+      listingDescription: data.listingDescription,
+      address: data.address || data.location,
+      forFarmers: data.forFarmers,
     };
-    loadIssues();
-  }, []);
+  })
+  .filter(listing => listing.forFarmers); // keep only the ones with forFarmers === true
 
+
+      setIssues(listings);
+    } catch (error) {
+      console.error("Failed to load issues:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  loadIssues();
+}, []);
   useEffect(() => {
     const selectIssue = async () => {
       if (selectedIssue) {
@@ -176,9 +141,21 @@ const IssuesPage = () => {
     startIndex + rowsPerPage
   );
 
-  const handleIssueClick = (listing) => {
-    setSelectedIssue(listing);
-  };
+ const handleIssueClick = async (listing) => {
+  setSelectedIssue(listing);
+  
+  // Try to get coordinates if not available
+  if (!listing.coordinates) {
+    const coordinates = await geocodeListingAddress(listing);
+    if (coordinates) {
+      // Update the listing with coordinates
+      setSelectedIssue({
+        ...listing,
+        coordinates
+      });
+    }
+  }
+};
 
   const handlePreviousPage = () => {
     if (currentPage > 1) {
@@ -308,8 +285,8 @@ const IssuesPage = () => {
                     </mark>
                   </td>
                   <td>
-                    <time dateTime={listing.reportedAt}>
-                      {new Date(listing.reportedAt).toLocaleDateString()}
+                    <time dateTime={listing.collectBy}>
+                      {listing.collectBy}
                     </time>
                   </td>
                   <td>{listing.location}</td>
@@ -422,10 +399,10 @@ const IssuesPage = () => {
                 </article>
                 
                 <article className="detail-item">
-                  <h4>Reported At</h4>
+                  <h4>Listed on</h4>
                   <p>
-                    <time dateTime={editedIssue.reportedAt}>
-                      {new Date(editedIssue.reportedAt).toLocaleString()}
+                    <time dateTime={editedIssue.dateListed}>
+                      {(editedIssue.dateListed)}
                     </time>
                   </p>
                 </article>
@@ -477,7 +454,7 @@ const IssuesPage = () => {
                   borderRadius: '6px',
                   fontSize: '14px'
                 }}>
-                  <p><strong>Collection Address:</strong> {editedIssue.address}</p>
+                  <p><strong>Collection Address:</strong> {editedIssue.address || editedIssue.location}</p>
                   <p><strong>Food Type:</strong> {editedIssue.typeOfFood}</p>
                 </div>
               </section>
