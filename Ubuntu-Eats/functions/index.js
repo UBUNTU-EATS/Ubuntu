@@ -215,9 +215,9 @@ exports.createDonationListing = functions.https.onRequest(corsWrapper(async (req
 }));
 
 // Geocode address function (simplified for now)
+
 exports.geocodeAddress = functions.https.onRequest(corsWrapper(async (req, res) => {
   try {
-    // Only allow POST requests
     if (req.method !== 'POST') {
       return res.status(405).json({
         success: false,
@@ -236,14 +236,45 @@ exports.geocodeAddress = functions.https.onRequest(corsWrapper(async (req, res) 
 
     console.log(`Geocoding request for: ${address}`);
     
-    // For now, return null coordinates
-    // You can implement actual geocoding using Google Maps API later
-    return res.status(200).json({
-      success: true,
-      coordinates: null, // [lat, lng] - implement actual geocoding service here
-      address: address,
-      message: "Geocoding completed (coordinates will be null for now)"
-    });
+    try {
+      const googleMapsApiKey = "AIzaSyDGsQG8-0j79bK3_fzM_gCyt90IpIOvmd8";
+      
+      const fetch = (await import('node-fetch')).default;
+      const encodedAddress = encodeURIComponent(`${address}, South Africa`);
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodedAddress}&region=ZA&key=${googleMapsApiKey}`;
+      
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      if (data.status === 'OK' && data.results.length > 0) {
+        const result = data.results[0];
+        const { lat, lng } = result.geometry.location;
+        
+        return res.status(200).json({
+          success: true,
+          coordinates: { lat, lng },
+          address: result.formatted_address,
+          message: "Address geocoded successfully"
+        });
+      } else {
+        console.log('Geocoding failed:', data.status, data.error_message);
+        return res.status(400).json({
+          success: false,
+          coordinates: null,
+          address: address,
+          message: `Geocoding failed: ${data.status}`
+        });
+      }
+      
+    } catch (error) {
+      console.error('Geocoding API error:', error);
+      return res.status(500).json({
+        success: false,
+        coordinates: null,
+        address: address,
+        message: "Geocoding service temporarily unavailable"
+      });
+    }
 
   } catch (error) {
     console.error("Error geocoding address:", error);

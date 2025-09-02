@@ -42,6 +42,35 @@ const IssuesPage = () => {
   };
 
 
+
+  // Add this function after handleSignOut
+const geocodeListingAddress = async (listing) => {
+  if (listing.coordinates) return listing.coordinates;
+  
+  try {
+    const authToken = localStorage.getItem('authToken');
+    // Replace 'your-project-id' with your actual Firebase project ID
+    const response = await fetch('https://us-central1-ubuntu-eats.cloudfunctions.net/geocodeAddress', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify({ address: listing.address || listing.location })
+    });
+    
+    const result = await response.json();
+    if (result.success && result.coordinates) {
+      return result.coordinates;
+    }
+  } catch (error) {
+    console.warn('Failed to geocode address:', error);
+  }
+  
+  return null;
+};
+
+
  useEffect(() => {
   const loadIssues = async () => {
     setIsLoading(true);
@@ -63,11 +92,9 @@ const IssuesPage = () => {
       collectBy: data.collectBy?.toDate().toLocaleString(),
       dateListed: data.dateListed?.toDate().toLocaleDateString(),
       location: data.location,
-      coordinates: data.coordinates
-        ? { lat: data.coordinates.latitude * -1, lng: data.coordinates.longitude }
-        : null,
+      coordinates: data.coordinates? { lat: data.coordinates.latitude, lng: data.coordinates.longitude }: null,
       listingDescription: data.listingDescription,
-      address: data.address,
+      address: data.address || data.location,
       forFarmers: data.forFarmers,
     };
   })
@@ -114,9 +141,21 @@ const IssuesPage = () => {
     startIndex + rowsPerPage
   );
 
-  const handleIssueClick = (listing) => {
-    setSelectedIssue(listing);
-  };
+ const handleIssueClick = async (listing) => {
+  setSelectedIssue(listing);
+  
+  // Try to get coordinates if not available
+  if (!listing.coordinates) {
+    const coordinates = await geocodeListingAddress(listing);
+    if (coordinates) {
+      // Update the listing with coordinates
+      setSelectedIssue({
+        ...listing,
+        coordinates
+      });
+    }
+  }
+};
 
   const handlePreviousPage = () => {
     if (currentPage > 1) {
@@ -415,7 +454,7 @@ const IssuesPage = () => {
                   borderRadius: '6px',
                   fontSize: '14px'
                 }}>
-                  <p><strong>Collection Address:</strong> {editedIssue.address}</p>
+                  <p><strong>Collection Address:</strong> {editedIssue.address || editedIssue.location}</p>
                   <p><strong>Food Type:</strong> {editedIssue.typeOfFood}</p>
                 </div>
               </section>
