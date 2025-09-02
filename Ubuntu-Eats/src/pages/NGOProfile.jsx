@@ -80,25 +80,24 @@ const NGOProfile = () => {
 
   return (
     <div className="ngo-profile">
-     <div className="profile-header">
-  <div className="header-left">
-    <h2>Organization Profile</h2>
-    <p>Manage your organization's information and preferences</p>
-  </div>
+      <div className="profile-header">
+        <div className="header-left">
+          <h2>Organization Profile</h2>
+          <p>Manage your organization's information and preferences</p>
+        </div>
 
-  <div className="header-right">
-<button
-  className="logout-btn"
-  onClick={async () => {
-    await auth.signOut();
-    navigate("/"); // replace "/" with your landing page route
-  }}
->
-  Logout
-</button>
-  </div>
-</div>
-
+        <div className="header-right">
+          <button
+            className="logout-btn"
+            onClick={async () => {
+              await auth.signOut();
+              navigate("/"); // replace "/" with your landing page route
+            }}
+          >
+            Logout
+          </button>
+        </div>
+      </div>
 
       <div className="profile-content">
         <div className="profile-card">
@@ -259,7 +258,9 @@ const NGOProfile = () => {
 
                 <div className="info-item">
                   <span className="info-label">Registration Number:</span>
-                  <span className="info-value">{ngoData.registrationNumber}</span>
+                  <span className="info-value">
+                    {ngoData.registrationNumber}
+                  </span>
                 </div>
 
                 <div className="info-item">
@@ -289,7 +290,11 @@ const NGOProfile = () => {
               </div>
 
               <div className="verification-status">
-                <div className={`status-badge ${verified ? "verified" : "pending"}`}>
+                <div
+                  className={`status-badge ${
+                    verified ? "verified" : "pending"
+                  }`}
+                >
                   <span className="status-icon">{verified ? "✅" : "⌛"}</span>
                   {verified ? "Verified Organization" : "Verification Pending"}
                 </div>
