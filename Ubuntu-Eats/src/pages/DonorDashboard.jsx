@@ -6,6 +6,7 @@ import "../styles/DonorDashboard.css";
 import LoadingDots from "./loading";
 import { db, auth } from "../../firebaseConfig";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
 
 const DonorDashboard = () => {
@@ -14,6 +15,7 @@ const DonorDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileFormData, setProfileFormData] = useState({});
+  const [authLoading, setAuthLoading] = useState(true); // Add auth loading state
   const navigate = useNavigate();
 
   const [donations, setDonations] = useState([
@@ -27,41 +29,47 @@ const DonorDashboard = () => {
     }
   ]);
 
-  // Fetch donor data from Firebase
+  // Wait for Firebase Auth to initialize before fetching donor data
   useEffect(() => {
-    const fetchDonorData = async () => {
-      try {
-        const user = auth.currentUser;
-        if (user) {
-          const docRef = doc(db, "users", user.email);
-          const docSnap = await getDoc(docRef);
-
-          if (docSnap.exists()) {
-            const data = docSnap.data();
-            if (data.role === "individual" || data.role === "company") {
-              setDonorData(data);
-              setProfileFormData(data);
-            } else {
-              console.warn("This user is not a donor.");
-              navigate("/"); // Redirect if not a donor
-            }
-          } else {
-            console.log("No donor data found!");
-            navigate("/"); // Redirect if no data
-          }
-        } else {
-          navigate("/"); // Redirect if not authenticated
-        }
-        setLoading(false);
-      } catch (error) {
-        console.error("Error fetching donor data:", error);
-        setLoading(false);
-        navigate("/"); // Redirect on error
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setAuthLoading(false);
+      if (user) {
+        fetchDonorData(user);
+      } else {
+        navigate("/"); // Redirect if not authenticated
       }
-    };
+    });
 
-    fetchDonorData();
+    return () => unsubscribe(); // Cleanup listener
   }, [navigate]);
+
+  // Fetch donor data from Firebase
+  const fetchDonorData = async (user) => {
+    try {
+      setLoading(true);
+      const docRef = doc(db, "users", user.email);
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.role === "individual" || data.role === "company") {
+          setDonorData(data);
+          setProfileFormData(data);
+        } else {
+          console.warn("This user is not a donor.");
+          navigate("/"); // Redirect if not a donor
+        }
+      } else {
+        console.log("No donor data found!");
+        navigate("/"); // Redirect if no data
+      }
+    } catch (error) {
+      console.error("Error fetching donor data:", error);
+      navigate("/"); // Redirect on error
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Handle donation submission
   const addDonation = (newDonation) => {
@@ -117,6 +125,15 @@ const DonorDashboard = () => {
       console.error("Error logging out:", error);
     }
   };
+
+  // Show loading while waiting for auth state
+  if (authLoading) {
+    return (
+      <section className="loading">
+        <LoadingDots numDots={10} radius={60} speed={0.6} size={20} />
+      </section>
+    );
+  }
 
   if (loading) return (
       <section className="loading">

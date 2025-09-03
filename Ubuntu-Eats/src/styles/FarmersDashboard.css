@@ -15,6 +15,13 @@ body {
   font-family: "Segoe UI", sans-serif;
 }
 
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+  min-height: 100vh;
+}
 
 .staff-icon {
   font-size: 45px;
@@ -29,18 +36,17 @@ body {
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
 }
 
-
 .facility-header {
   display: flex;
   align-items: center;           
-  justify-content: flex-start;   
+  justify-content: center;   
   padding: 60px 40px 20px 40px;
   background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%);
   border-radius: 15px;
   box-shadow: 0 8px 30px rgba(12, 36, 97, 0.15);
   margin-bottom: 40px;
-  width: 1000px;
-  max-width: 1400px;
+  width: 100%;
+  max-width: 1000px;
   height: 200px;
   position: relative;
   color: white;
@@ -62,6 +68,8 @@ body {
 .header-content {
   display: flex;
   align-items: center;
+  justify-content: center;
+  width: 100%;
   gap: 20px; /* space between icon and text */
 }
 
@@ -97,9 +105,8 @@ body {
   gap: 25px;
   margin-bottom: 40px;
   max-width: 1200px;
-  margin-left: auto;
-  margin-right: auto;
-  justify-items: start; /* align cards left */
+  width: 100%;
+  justify-items: center; /* center the cards */
 }
 
 /* Card */
@@ -115,8 +122,8 @@ body {
   position: relative;
   z-index: 1;
   overflow: hidden;
-  max-width: 400px; /* limit width */
-  width: 340px;
+  max-width: 400px;
+  width: 100%;
 }
 
 .facility-card:hover {
@@ -142,10 +149,16 @@ body {
   line-height: 1.7;
 }
 
+.card-icon {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 15px;
+  font-size: 32px;
+  color: #2e7d32;
+}
+
 /* Button */
 .facility-btn {
-
-  
   background: linear-gradient(to right, #ffcc00,#ffcc00);
   color: white;
   border: none;
@@ -213,15 +226,21 @@ body {
 @media (max-width: 768px) {
   .facility-header {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: center;
     height: auto;
     padding: 40px 20px;
+    text-align: center;
   }
 
   .header-content {
-    flex-direction: row;
+    flex-direction: column;
     align-items: center;
+    text-align: center;
     gap: 15px;
+  }
+
+  .header-content section:nth-child(2) {
+    align-items: center;
   }
 
   .card-grid {

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../../firebaseConfig";
 import { doc, getDoc } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
 import UserManagement from "./UserManagement";
 import DonationApprovals from "./DonationApprovals";
 import SystemAnalytics from "./SystemAnalytics";
@@ -19,57 +20,71 @@ const AdminDashboard = () => {
     mealsSaved: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(true);
   const navigate = useNavigate();
 
+  // Wait for Firebase Auth to initialize before fetching admin data
   useEffect(() => {
-    const fetchAdminData = async () => {
-      try {
-        const user = auth.currentUser;
-
-        if (!user) {
-          console.warn("No authenticated user. Redirecting...");
-          navigate("/");
-          return;
-        }
-
-        const userRef = doc(db, "users", user.email);
-        const userSnap = await getDoc(userRef);
-
-        if (!userSnap.exists()) {
-          console.warn("User document not found. Redirecting...");
-          navigate("/");
-          return;
-        }
-
-        const data = userSnap.data();
-
-        if (data.role?.toLowerCase() !== "admin") {
-          console.warn("Access denied. User is not an admin.");
-          navigate("/");
-          return;
-        }
-
-        // Set user data
-        setAdminData(data);
-
-        // Simulate fetching stats (replace with real DB queries)
-        setStats({
-          pendingUsers: 12,
-          pendingApprovals: 8,
-          totalUsers: 156,
-          totalDonations: 245,
-          mealsSaved: 1250,
-        });
-      } catch (error) {
-        console.error("Error fetching admin data:", error);
-        navigate("/");
-      } finally {
-        setLoading(false);
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setAuthLoading(false);
+      if (user) {
+        fetchAdminData(user);
+      } else {
+        navigate("/"); // Redirect if not authenticated
       }
-    };
+    });
 
-    fetchAdminData();
+    return () => unsubscribe(); // Cleanup listener
   }, [navigate]);
+
+  const fetchAdminData = async (user) => {
+    try {
+      setLoading(true);
+
+      const userRef = doc(db, "users", user.email);
+      const userSnap = await getDoc(userRef);
+
+      if (!userSnap.exists()) {
+        console.warn("User document not found. Redirecting...");
+        navigate("/");
+        return;
+      }
+
+      const data = userSnap.data();
+
+      if (data.role?.toLowerCase() !== "admin") {
+        console.warn("Access denied. User is not an admin.");
+        navigate("/");
+        return;
+      }
+
+      // Set user data
+      setAdminData(data);
+
+      // Simulate fetching stats (replace with real DB queries)
+      setStats({
+        pendingUsers: 12,
+        pendingApprovals: 8,
+        totalUsers: 156,
+        totalDonations: 245,
+        mealsSaved: 1250,
+      });
+    } catch (error) {
+      console.error("Error fetching admin data:", error);
+      navigate("/");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Show loading while waiting for auth state
+  if (authLoading) {
+    return (
+      <section className="loading">
+        <LoadingDots numDots={10} radius={60} speed={0.6} size={20} />
+      </section>
+    );
+  }
 
   if (loading) {
     return (

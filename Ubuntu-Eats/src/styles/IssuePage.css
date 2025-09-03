@@ -1,6 +1,9 @@
 /* IssuesPage.css */
 .issues-page {
   font-family: 'Poppins', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .facility-header {

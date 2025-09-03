@@ -11,6 +11,7 @@ import {
   getDoc,
   deleteDoc,
 } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
 import { db, auth } from "../../firebaseConfig";
 import NGOProfile from "./NGOProfile";
 import ActiveDonations from "./ActiveDonations";
@@ -18,23 +19,34 @@ import ClaimedDonations from "./ClaimedDonations";
 import "../styles/NGODashboard.css";
 import LoadingDots from "./loading";
 import { useNavigate } from "react-router-dom";
+
 const NGODashboard = () => {
   const [activeTab, setActiveTab] = useState("available");
   const [ngoData, setNgoData] = useState(null);
   const [availableDonations, setAvailableDonations] = useState([]);
   const [claimedDonations, setClaimedDonations] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(true);
   const [userEmail, setUserEmail] = useState("");
   const navigate = useNavigate();
-  // Fetch NGO data and donations
+
+  // Wait for Firebase Auth to initialize before fetching NGO data
   useEffect(() => {
-  const fetchNGOData = async () => {
-    try {
-      const user = auth.currentUser;
-      if (!user) {
-        navigate("/"); // Not logged in
-        return;
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setAuthLoading(false);
+      if (user) {
+        fetchNGOData(user);
+      } else {
+        navigate("/"); // Redirect if not authenticated
       }
+    });
+
+    return () => unsubscribe(); // Cleanup listener
+  }, [navigate]);
+
+  const fetchNGOData = async (user) => {
+    try {
+      setLoading(true);
 
       const docRef = doc(db, "users", user.email);
       const docSnap = await getDoc(docRef);
@@ -55,17 +67,13 @@ const NGODashboard = () => {
 
       setNgoData(data);
       setUserEmail(user.email);
-      setLoading(false);
     } catch (error) {
       console.error("Error fetching NGO data:", error);
-      setLoading(false);
       navigate("/"); // On error, redirect
+    } finally {
+      setLoading(false);
     }
   };
-
-  fetchNGOData();
-}, [navigate]);
-
 
   const claimDonation = async (donationId, collectionMethod) => {
     try {
@@ -180,14 +188,22 @@ const NGODashboard = () => {
     }
   };
 
-if (loading) {
-  return (
-    <section className="loading">
-      <LoadingDots numDots={10} radius={60} speed={0.6} size={20} />
-    </section>
-  );
-}
+  // Show loading while waiting for auth state
+  if (authLoading) {
+    return (
+      <section className="loading">
+        <LoadingDots numDots={10} radius={60} speed={0.6} size={20} />
+      </section>
+    );
+  }
 
+  if (loading) {
+    return (
+      <section className="loading">
+        <LoadingDots numDots={10} radius={60} speed={0.6} size={20} />
+      </section>
+    );
+  }
 
   return (
     <div className="ngo-dashboard">
