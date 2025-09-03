@@ -102,6 +102,26 @@ const handleStatusChange = async (userId, status) => {
     console.error("Error updating status:", error);
   }
 };
+const handleRejectUser = async (userId) => {
+  const confirmReject = window.confirm(
+    "Are you sure you want to reject this user?"
+  );
+  if (!confirmReject) return;
+
+  try {
+    const userRef = doc(db, "users", userId);
+    await updateDoc(userRef, { status: "rejected" }); // 🔥 Just update status
+
+    console.log(`User ${userId} has been rejected`);
+
+    // Remove from the local state if current filter is pending
+    setUsers((prevUsers) => prevUsers.filter((user) => user.id !== userId));
+
+    if (selectedUser && selectedUser.id === userId) setSelectedUser(null);
+  } catch (error) {
+    console.error("Error rejecting user:", error);
+  }
+};
 
 const handleDeleteUser = async (userId) => {
   const confirmDelete = window.confirm(
@@ -201,11 +221,11 @@ const handleDeleteUser = async (userId) => {
                         {getUserTypeLabel(user.type)}
                       </div>
                     </td>
-                    <td>
+                    {/* <td>
                       <div className="registration-date">
                         {formatDate(user.registrationDate)}
                       </div>
-                    </td>
+                    </td> */}
                     <td>{getStatusBadge(user.status)}</td>
                     <td>
                       <div className="action-buttons">
@@ -225,9 +245,9 @@ const handleDeleteUser = async (userId) => {
     </button>
     <button
       className="reject-btn"
-      onClick={() => handleDeleteUser(user.id)}
+      onClick={() => handleRejectUser(user.id)}
     >
-      Remove
+      Reject
     </button>
   </>
 )}

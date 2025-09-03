@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../../firebaseConfig";
-import { doc, getDoc } from "firebase/firestore";
+// import { doc, getDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import UserManagement from "./UserManagement";
 import DonationApprovals from "./DonationApprovals";
 import SystemAnalytics from "./SystemAnalytics";
 import LoadingDots from "./loading";
 import "../styles/AdminDashboard.css";
+import {doc, collection, query, where, getDocs ,getDoc} from "firebase/firestore";
+
 
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState("users");
@@ -36,46 +38,78 @@ const AdminDashboard = () => {
 
     return () => unsubscribe(); // Cleanup listener
   }, [navigate]);
+// Fetch real stats
+const fetchStats = async () => {
+  try {
+    // Total Users
+    const usersRef = collection(db, "users");
+    const usersSnap = await getDocs(usersRef);
+    const allUsers = usersSnap.docs.map((doc) => doc.data());
+    const totalUsers = allUsers.length;
+    const pendingUsers = allUsers.filter((u) => u.status === "pending").length;
+
+    // Total Donations (assuming you have a 'donations' collection)
+    const donationsRef = collection(db, "donations");
+    const donationsSnap = await getDocs(donationsRef);
+    const totalDonations = donationsSnap.size;
+
+    // Pending Approvals (claims)
+    const claimsRef = collection(db, "claims");
+    const pendingClaimsSnap = await getDocs(query(claimsRef, where("status", "==", "PENDING")));
+    const pendingApprovals = pendingClaimsSnap.size;
+
+    // Meals Saved (example: sum of a field 'mealsSaved' in donations)
+    let mealsSaved = 0;
+    donationsSnap.forEach((doc) => {
+      const data = doc.data();
+      mealsSaved += data.mealsSaved || 0;
+    });
+
+    setStats({
+      pendingUsers,
+      pendingApprovals,
+      totalUsers,
+      totalDonations,
+      mealsSaved,
+    });
+  } catch (error) {
+    console.error("Error fetching dashboard stats:", error);
+  }
+};
 
   const fetchAdminData = async (user) => {
-    try {
-      setLoading(true);
+  try {
+    setLoading(true);
 
-      const userRef = doc(db, "users", user.email);
-      const userSnap = await getDoc(userRef);
+    const userRef = doc(db, "users", user.email);
+    const userSnap = await getDoc(userRef);
 
-      if (!userSnap.exists()) {
-        console.warn("User document not found. Redirecting...");
-        navigate("/");
-        return;
-      }
-
-      const data = userSnap.data();
-
-      if (data.role?.toLowerCase() !== "admin") {
-        console.warn("Access denied. User is not an admin.");
-        navigate("/");
-        return;
-      }
-
-      // Set user data
-      setAdminData(data);
-
-      // Simulate fetching stats (replace with real DB queries)
-      setStats({
-        pendingUsers: 12,
-        pendingApprovals: 8,
-        totalUsers: 156,
-        totalDonations: 245,
-        mealsSaved: 1250,
-      });
-    } catch (error) {
-      console.error("Error fetching admin data:", error);
+    if (!userSnap.exists()) {
+      console.warn("User document not found. Redirecting...");
       navigate("/");
-    } finally {
-      setLoading(false);
+      return;
     }
-  };
+
+    const data = userSnap.data();
+
+    if (data.role?.toLowerCase() !== "admin") {
+      console.warn("Access denied. User is not an admin.");
+      navigate("/");
+      return;
+    }
+
+    // Set admin data
+    setAdminData(data);
+
+    // Fetch real stats
+    await fetchStats();
+  } catch (error) {
+    console.error("Error fetching admin data:", error);
+    navigate("/");
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Show loading while waiting for auth state
   if (authLoading) {
@@ -140,7 +174,7 @@ const AdminDashboard = () => {
         {[
           { key: "users", label: "User Management" },
           { key: "approvals", label: "Donation Approvals" },
-          { key: "analytics", label: "System Analytics" },
+          // { key: "analytics", label: "System Analytics" },
         ].map((tab) => (
           <button
             key={tab.key}
@@ -156,7 +190,7 @@ const AdminDashboard = () => {
       <main className="dashboard-content">
         {activeTab === "users" && <UserManagement />}
         {activeTab === "approvals" && <DonationApprovals />}
-        {activeTab === "analytics" && <SystemAnalytics />}
+        {/* {activeTab === "analytics" && <SystemAnalytics />} */}
       </main>
     </div>
   );
