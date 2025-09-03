@@ -1,156 +1,250 @@
 import React, { useState, useEffect } from "react";
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  doc,
+  updateDoc,
+  addDoc,
+  serverTimestamp,
+  getDoc,
+  getDocs,
+} from "firebase/firestore";
+import { db, auth } from "../../firebaseConfig";
 import VolunteerProfile from "./VolunteerProfile";
 import AvailableDeliveries from "./AvailableDeliveries";
 import MyDeliveries from "./MyDeliveries";
 import "../styles/VolunteerDashboard.css";
-import LoadingDots from "./loading";
+
 const VolunteerDashboard = () => {
   const [activeTab, setActiveTab] = useState("available");
-  const [volunteerData, setVolunteerData] = useState({
-    name: "Sarah Johnson",
-    email: "sarah.johnson@email.com",
-    phone: "+27 11 777 8888",
-    address: "123 Volunteer St, Johannesburg, Gauteng",
-    vehicleType: "SUV",
-    availability: "Weekends and Evenings",
-    maxDistance: "25 km",
-    completedDeliveries: 12,
-  });
-    const [loading, setLoading] = useState(true);
+  const [volunteerData, setVolunteerData] = useState(null);
+  const [availableDeliveries, setAvailableDeliveries] = useState([]);
+  const [myDeliveries, setMyDeliveries] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [userEmail, setUserEmail] = useState("");
 
+  // Fetch volunteer data and deliveries
   useEffect(() => {
-    // Simulate loading data
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 5000);
-    return () => clearTimeout(timer);
+    const user = auth.currentUser;
+    if (!user) return;
+
+    setUserEmail(user.email);
+
+    // Fetch volunteer profile data
+    const fetchVolunteerData = async () => {
+      try {
+        const userDocRef = doc(db, "users", user.email);
+        const userDoc = await getDoc(userDocRef);
+        if (userDoc.exists()) {
+          setVolunteerData(userDoc.data());
+        } else {
+          console.error("Volunteer data not found for email:", user.email);
+        }
+      } catch (error) {
+        console.error("Error fetching volunteer data:", error);
+      }
+    };
+
+    // Fetch available deliveries (CLAIMED status with volunteer collection method)
+    const availableQuery = query(
+      collection(db, "claims"),
+      where("collectionMethod", "==", "volunteer"),
+      where("volunteerAssigned", "==", null),
+      where("status", "==", "CLAIMED")
+    );
+
+    const availableUnsubscribe = onSnapshot(
+      availableQuery,
+      async (snapshot) => {
+        const deliveries = await Promise.all(
+          snapshot.docs.map(async (docSnapshot) => {
+            const claimData = {
+              claimId: docSnapshot.id,
+              ...docSnapshot.data(),
+            };
+
+            try {
+              // Get the donation data for this claim
+              const donationDoc = await getDoc(
+                doc(db, "foodListings", claimData.listingId)
+              );
+              if (donationDoc.exists()) {
+                return {
+                  ...claimData,
+                  ...donationDoc.data(),
+                };
+              }
+              return claimData;
+            } catch (error) {
+              console.error("Error fetching donation data:", error);
+              return claimData;
+            }
+          })
+        );
+
+        setAvailableDeliveries(deliveries);
+      }
+    );
+
+    // Fetch deliveries assigned to this volunteer
+    const myDeliveriesQuery = query(
+      collection(db, "deliveryAssignments"),
+      where("volunteerEmail", "==", user.email)
+    );
+
+    const myDeliveriesUnsubscribe = onSnapshot(
+      myDeliveriesQuery,
+      async (snapshot) => {
+        const deliveries = await Promise.all(
+          snapshot.docs.map(async (docSnapshot) => {
+            const deliveryData = {
+              deliveryId: docSnapshot.id,
+              ...docSnapshot.data(),
+            };
+
+            try {
+              // Get the claim data for this delivery
+              const claimDoc = await getDoc(
+                doc(db, "claims", deliveryData.claimId)
+              );
+
+              // Get the donation data for this claim
+              const donationDoc = await getDoc(
+                doc(db, "foodListings", deliveryData.listingId)
+              );
+
+              if (claimDoc.exists() && donationDoc.exists()) {
+                return {
+                  ...deliveryData,
+                  ...claimDoc.data(),
+                  ...donationDoc.data(),
+                };
+              }
+              return deliveryData;
+            } catch (error) {
+              console.error("Error fetching claim or donation data:", error);
+              return deliveryData;
+            }
+          })
+        );
+
+        setMyDeliveries(deliveries);
+        setLoading(false);
+      }
+    );
+
+    fetchVolunteerData();
+
+    // Cleanup subscriptions
+    return () => {
+      availableUnsubscribe();
+      myDeliveriesUnsubscribe();
+    };
   }, []);
-  // Mock data for available deliveries
-  const [availableDeliveries, setAvailableDeliveries] = useState([
-    {
-      id: 1,
-      donorName: "Green Valley Restaurant",
-      recipientName: "Hope Community Center",
-      foodType: "Fresh Sandwiches",
-      quantity: "20 units",
-      category: "fresh-meals",
-      pickupTime: "2025-08-31 14:00",
-      pickupLocation: "123 Main St, Johannesburg",
-      deliveryLocation: "456 Oak Ave, Johannesburg",
-      distance: "8.2 km",
-      status: "needs_delivery",
-      specialInstructions: "Fragile items, handle with care",
-      urgency: "high",
-    },
-    {
-      id: 2,
-      donorName: "Sunshine Bakery",
-      recipientName: "Children's Shelter",
-      foodType: "Assorted Pastries",
-      quantity: "15 kg",
-      category: "bakery",
-      pickupTime: "2025-08-31 16:00",
-      pickupLocation: "789 Bread St, Johannesburg",
-      deliveryLocation: "321 Shelter Rd, Johannesburg",
-      distance: "12.5 km",
-      status: "needs_delivery",
-      specialInstructions: "No special instructions",
-      urgency: "medium",
-    },
-    {
-      id: 3,
-      donorName: "Fresh Market",
-      recipientName: "Elderly Care Home",
-      foodType: "Mixed Vegetables",
-      quantity: "30 kg",
-      category: "fruits-vegetables",
-      pickupTime: "2025-09-01 10:00",
-      pickupLocation: "321 Produce Ave, Johannesburg",
-      deliveryLocation: "654 Care Lane, Johannesburg",
-      distance: "15.3 km",
-      status: "needs_delivery",
-      specialInstructions: "Perishable items, need quick delivery",
-      urgency: "high",
-    },
-  ]);
 
-  // Mock data for accepted deliveries
-  const [acceptedDeliveries, setAcceptedDeliveries] = useState([
-    {
-      id: 101,
-      donorName: "City Cafe",
-      recipientName: "Community Kitchen",
-      foodType: "Prepared Meals",
-      quantity: "25 portions",
-      category: "fresh-meals",
-      pickupTime: "2025-08-30 15:00",
-      pickupLocation: "555 Urban St, Johannesburg",
-      deliveryLocation: "777 Kitchen Rd, Johannesburg",
-      distance: "9.8 km",
-      status: "accepted",
-      acceptedAt: "2025-08-30 14:30",
-      specialInstructions: "Ring bell twice for kitchen",
-      estimatedDeliveryTime: "30 minutes",
-      urgency: "medium",
-    },
-  ]);
+  const acceptDelivery = async (claimId, listingId, ngoEmail, ngoName) => {
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error("User not authenticated");
 
-  const acceptDelivery = (deliveryId) => {
-    const delivery = availableDeliveries.find((d) => d.id === deliveryId);
-    if (delivery) {
-      // Remove from available
-      setAvailableDeliveries((prev) => prev.filter((d) => d.id !== deliveryId));
+      const claimRef = doc(db, "claims", claimId);
+      const claimDoc = await getDoc(claimRef);
 
-      // Add to accepted with additional info
-      const acceptedDelivery = {
-        ...delivery,
-        status: "accepted",
-        acceptedAt: new Date().toISOString(),
-        estimatedDeliveryTime: "30 minutes", // This would be calculated based on distance
+      if (!claimDoc.exists()) {
+        throw new Error("Claim not found");
+      }
+
+      // Create a delivery assignment document
+      const deliveryAssignment = {
+        claimId: claimId,
+        listingId: listingId,
+        volunteerId: user.uid,
+        volunteerEmail: user.email,
+        volunteerName: volunteerData?.name || user.displayName || "Volunteer",
+        ngoEmail: ngoEmail,
+        ngoName: ngoName,
+        status: "ASSIGNED",
+        assignedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       };
 
-      setAcceptedDeliveries((prev) => [...prev, acceptedDelivery]);
+      // Add to deliveryAssignments collection
+      await addDoc(collection(db, "deliveryAssignments"), deliveryAssignment);
+
+      // Update the claim with volunteer assignment
+      await updateDoc(claimRef, {
+        volunteerAssigned: user.email,
+        volunteerAssignedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      console.log("Delivery accepted successfully");
+      return true;
+    } catch (error) {
+      console.error("Error accepting delivery:", error);
+      throw error;
     }
   };
 
-  const confirmDelivery = (deliveryId) => {
-    setAcceptedDeliveries((prev) =>
-      prev.map((delivery) =>
-        delivery.id === deliveryId
-          ? {
-              ...delivery,
-              status: "delivered",
-              deliveredAt: new Date().toISOString(),
-            }
-          : delivery
-      )
-    );
+  const confirmDelivery = async (deliveryId, claimId, listingId) => {
+    try {
+      const deliveryRef = doc(db, "deliveryAssignments", deliveryId);
+      const claimRef = doc(db, "claims", claimId);
+      const listingRef = doc(db, "foodListings", listingId);
+
+      // Update delivery status
+      await updateDoc(deliveryRef, {
+        status: "DELIVERED",
+        deliveredAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      // Update claim status
+      await updateDoc(claimRef, {
+        status: "COLLECTED",
+        collectedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      // Update listing status
+      await updateDoc(listingRef, {
+        listingStatus: "COLLECTED",
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error("Error confirming delivery:", error);
+      throw error;
+    }
   };
 
-  const cancelDelivery = (deliveryId) => {
-    const delivery = acceptedDeliveries.find((d) => d.id === deliveryId);
-    if (delivery) {
-      // Remove from accepted
-      setAcceptedDeliveries((prev) => prev.filter((d) => d.id !== deliveryId));
+  const cancelDelivery = async (deliveryId, claimId) => {
+    try {
+      const deliveryRef = doc(db, "deliveryAssignments", deliveryId);
+      const claimRef = doc(db, "claims", claimId);
 
-      // Add back to available
-      const availableDelivery = {
-        ...delivery,
-        status: "needs_delivery",
-        acceptedAt: undefined,
-        estimatedDeliveryTime: undefined,
-      };
+      // Delete the delivery assignment
+      await updateDoc(deliveryRef, {
+        status: "CANCELLED",
+        cancelledAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
 
-      setAvailableDeliveries((prev) => [...prev, availableDelivery]);
+      // Remove volunteer assignment from claim
+      await updateDoc(claimRef, {
+        volunteerAssigned: null,
+        volunteerAssignedAt: null,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error("Error canceling delivery:", error);
+      throw error;
     }
   };
 
   if (loading) {
-    return (
-      <section className="loading">
-        <LoadingDots numDots={10} radius={60} speed={0.6} size={20} />
-      </section>
-    );
+    return <div className="loading">Loading...</div>;
   }
 
   return (
@@ -159,7 +253,9 @@ const VolunteerDashboard = () => {
       <header className="dashboard-header">
         <div className="header-content">
           <h1 className="dashboard-title">Volunteer Dashboard</h1>
-          <p className="welcome-text">Welcome, {volunteerData.name}!</p>
+          <p className="welcome-text">
+            Welcome, {volunteerData?.name || userEmail}!
+          </p>
         </div>
         <div className="header-stats">
           <div className="stat-card">
@@ -167,12 +263,12 @@ const VolunteerDashboard = () => {
             <span className="stat-label">Available Deliveries</span>
           </div>
           <div className="stat-card">
-            <span className="stat-number">{acceptedDeliveries.length}</span>
+            <span className="stat-number">{myDeliveries.length}</span>
             <span className="stat-label">My Deliveries</span>
           </div>
           <div className="stat-card">
             <span className="stat-number">
-              {volunteerData.completedDeliveries}
+              {myDeliveries.filter((d) => d.status === "DELIVERED").length}
             </span>
             <span className="stat-label">Completed</span>
           </div>
@@ -197,13 +293,13 @@ const VolunteerDashboard = () => {
           className={`nav-tab ${activeTab === "myDeliveries" ? "active" : ""}`}
           onClick={() => setActiveTab("myDeliveries")}
         >
-          My Deliveries ({acceptedDeliveries.length})
+          My Deliveries ({myDeliveries.length})
         </button>
       </nav>
 
       {/* Tab Content */}
       <main className="dashboard-content">
-        {activeTab === "profile" && (
+        {activeTab === "profile" && volunteerData && (
           <VolunteerProfile
             volunteerData={volunteerData}
             setVolunteerData={setVolunteerData}
@@ -214,13 +310,13 @@ const VolunteerDashboard = () => {
           <AvailableDeliveries
             deliveries={availableDeliveries}
             onAccept={acceptDelivery}
-            maxDistance={volunteerData.maxDistance}
+            maxDistance={volunteerData?.maxDistance || "25 km"}
           />
         )}
 
         {activeTab === "myDeliveries" && (
           <MyDeliveries
-            deliveries={acceptedDeliveries}
+            deliveries={myDeliveries}
             onConfirmDelivery={confirmDelivery}
             onCancelDelivery={cancelDelivery}
           />

@@ -11,13 +11,10 @@ import {
   getDoc,
   deleteDoc,
 } from "firebase/firestore";
-import { onAuthStateChanged } from "firebase/auth";
 import { db, auth } from "../../firebaseConfig";
-import { useNavigate } from "react-router-dom";
 import NGOProfile from "./NGOProfile";
 import AvailableDonations from "./AvailableDonations";
 import ClaimedDonations from "./ClaimedDonations";
-import LoadingDots from "./loading";
 import "../styles/NGODashboard.css";
 
 const NGODashboard = () => {
@@ -26,112 +23,90 @@ const NGODashboard = () => {
   const [availableDonations, setAvailableDonations] = useState([]);
   const [claimedDonations, setClaimedDonations] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [authLoading, setAuthLoading] = useState(true);
   const [userEmail, setUserEmail] = useState("");
-  const navigate = useNavigate();
-
-  // Wait for Firebase Auth to initialize before fetching NGO data
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setAuthLoading(false);
-      if (user) {
-        setUserEmail(user.email);
-        fetchNGODataAndDonations(user);
-      } else {
-        navigate("/"); // Redirect if not authenticated
-      }
-    });
-
-    return () => unsubscribe(); // Cleanup listener
-  }, [navigate]);
 
   // Fetch NGO data and donations
-  const fetchNGODataAndDonations = async (user) => {
-    try {
-      setLoading(true);
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
 
-      // Check if user is NGO
-      const userDocRef = doc(db, "users", user.email);
-      const userDoc = await getDoc(userDocRef);
-      
-      if (!userDoc.exists()) {
-        console.error("NGO data not found for email:", user.email);
-        navigate("/");
-        return;
+    setUserEmail(user.email);
+
+    // Fetch NGO profile data
+    const fetchNGOData = async () => {
+      try {
+        const userDocRef = doc(db, "users", user.email);
+        const userDoc = await getDoc(userDocRef);
+        if (userDoc.exists()) {
+          setNgoData(userDoc.data());
+        } else {
+          console.error("NGO data not found for email:", user.email);
+        }
+      } catch (error) {
+        console.error("Error fetching NGO data:", error);
       }
+    };
 
-      const userData = userDoc.data();
-      if (userData.role !== "ngo") {
-        console.warn("User is not an NGO!");
-        navigate("/");
-        return;
-      }
+    // Fetch available donations (UNCLAIMED status)
+    const availableQuery = query(
+      collection(db, "foodListings"),
+      where("listingStatus", "==", "UNCLAIMED")
+    );
 
-      setNgoData(userData);
+    const availableUnsubscribe = onSnapshot(availableQuery, (snapshot) => {
+      const donations = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setAvailableDonations(donations);
+    });
 
-      // Fetch available donations (UNCLAIMED status)
-      const availableQuery = query(
-        collection(db, "foodListings"),
-        where("listingStatus", "==", "UNCLAIMED")
-      );
+    // Fetch claimed donations by this NGO
+    const claimedQuery = query(
+      collection(db, "claims"),
+      where("ngoEmail", "==", user.email)
+    );
 
-      const availableUnsubscribe = onSnapshot(availableQuery, (snapshot) => {
-        const donations = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setAvailableDonations(donations);
-      });
+    const claimedUnsubscribe = onSnapshot(claimedQuery, async (snapshot) => {
+      const claims = snapshot.docs.map((doc) => ({
+        claimId: doc.id,
+        ...doc.data(),
+      }));
 
-      // Fetch claimed donations by this NGO
-      const claimedQuery = query(
-        collection(db, "claims"),
-        where("ngoEmail", "==", user.email)
-      );
-
-      const claimedUnsubscribe = onSnapshot(claimedQuery, async (snapshot) => {
-        const claims = snapshot.docs.map((doc) => ({
-          claimId: doc.id,
-          ...doc.data(),
-        }));
-
-        // Get the actual donation data for each claim
-        const claimedDonationsData = await Promise.all(
-          claims.map(async (claim) => {
-            try {
-              const donationDoc = await getDoc(
-                doc(db, "foodListings", claim.listingId)
-              );
-              if (donationDoc.exists()) {
-                return {
-                  ...claim,
-                  ...donationDoc.data(),
-                  claimId: claim.claimId,
-                };
-              }
-              return claim;
-            } catch (error) {
-              console.error("Error fetching donation data:", error);
-              return claim;
+      // Get the actual donation data for each claim
+      const claimedDonationsData = await Promise.all(
+        claims.map(async (claim) => {
+          try {
+            const donationDoc = await getDoc(
+              doc(db, "foodListings", claim.listingId)
+            );
+            if (donationDoc.exists()) {
+              return {
+                ...claim,
+                ...donationDoc.data(),
+                claimId: claim.claimId,
+              };
             }
-          })
-        );
+            return claim;
+          } catch (error) {
+            console.error("Error fetching donation data:", error);
+            return claim;
+          }
+        })
+      );
 
-        setClaimedDonations(claimedDonationsData);
-        setLoading(false);
-      });
-
-      // Store unsubscribe functions for cleanup
-      return () => {
-        availableUnsubscribe();
-        claimedUnsubscribe();
-      };
-    } catch (error) {
-      console.error("Error fetching NGO data:", error);
-      navigate("/");
+      setClaimedDonations(claimedDonationsData);
       setLoading(false);
-    }
-  };
+    });
+
+    fetchNGOData();
+
+    // Cleanup subscriptions
+    return () => {
+      availableUnsubscribe();
+      claimedUnsubscribe();
+    };
+  }, []);
 
   const claimDonation = async (donationId, collectionMethod) => {
     try {
@@ -164,7 +139,7 @@ const NGODashboard = () => {
         ngoEmail: user.email,
         ngoName: ngoName,
         claimDate: serverTimestamp(),
-        status: "CLAIMED",
+        status: "PENDING",
         collectionMethod: collectionMethod || "pending", // Default to "pending" if undefined
         volunteerAssigned: null,
         createdAt: serverTimestamp(),
@@ -175,7 +150,7 @@ const NGODashboard = () => {
 
       // Update donation status
       await updateDoc(donationRef, {
-        listingStatus: "CLAIMED",
+        listingStatus: "PENDING",
         claimedBy: user.uid,
         claimedByEmail: user.email,
         claimedAt: serverTimestamp(),
@@ -246,21 +221,8 @@ const NGODashboard = () => {
     }
   };
 
-  // Show loading while waiting for auth state
-  if (authLoading) {
-    return (
-      <section className="loading">
-        <LoadingDots numDots={10} radius={60} speed={0.6} size={20} />
-      </section>
-    );
-  }
-
   if (loading) {
-    return (
-      <section className="loading">
-        <LoadingDots numDots={10} radius={60} speed={0.6} size={20} />
-      </section>
-    );
+    return <div className="loading">Loading...</div>;
   }
 
   return (

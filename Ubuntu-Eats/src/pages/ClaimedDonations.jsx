@@ -3,6 +3,7 @@ import "../styles/ClaimedDonations.css";
 import { auth } from "../../firebaseConfig";
 import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebaseConfig";
+import RouteMap from "./RouteMap";
 
 const ClaimedDonations = ({
   donations,
@@ -16,6 +17,10 @@ const ClaimedDonations = ({
     []
   );
   const [selectedDonation, setSelectedDonation] = useState(null);
+  const [userLocation, setUserLocation] = useState({
+    lat: -26.2041,
+    lng: 28.0473,
+  }); // Default to Johannesburg
 
   // Chat functionality states
   const [chatModal, setChatModal] = useState({ open: false, donation: null });
@@ -28,6 +33,23 @@ const ClaimedDonations = ({
   const [messageCache, setMessageCache] = useState(new Map());
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [userCache, setUserCache] = useState(new Map());
+
+  // Get user's current location
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          });
+        },
+        (error) => {
+          console.log("Geolocation error:", error);
+        }
+      );
+    }
+  }, []);
 
   // Timer effect to check for volunteer timeout
   useEffect(() => {
@@ -590,29 +612,6 @@ const ClaimedDonations = ({
 
   return (
     <div className="modern-claimed-donations">
-      {/* Header Section */}
-      <div className="donations-header">
-        <div className="header-main">
-          <h1>My Claimed Donations</h1>
-          <p>Manage your claimed food donations and collection process</p>
-        </div>
-
-        <div className="header-stats">
-          <div className="stat-item">
-            <span className="stat-number">{totalClaims}</span>
-            <span className="stat-label">Total</span>
-          </div>
-          <div className="stat-item">
-            <span className="stat-number">{toCollectClaims}</span>
-            <span className="stat-label">To Collect</span>
-          </div>
-          <div className="stat-item">
-            <span className="stat-number">{collectedClaims}</span>
-            <span className="stat-label">Collected</span>
-          </div>
-        </div>
-      </div>
-
       {/* Controls Section */}
       <div className="donations-controls">
         <div className="filter-section">
@@ -931,7 +930,7 @@ const ClaimedDonations = ({
         </div>
       )}
 
-      {/* Details Modal */}
+      {/* Details Modal with Map */}
       {selectedDonation && (
         <div
           className="modal-backdrop"
@@ -1022,6 +1021,62 @@ const ClaimedDonations = ({
                     <div className="grid-item">
                       <strong>Contact Phone:</strong>
                       <span>{selectedDonation.contactPhone || "N/A"}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Map Section */}
+                <div className="detail-section">
+                  <h4>Route to Collection Point</h4>
+                  <div className="map-section" style={{ marginTop: "15px" }}>
+                    <RouteMap
+                      origin={userLocation}
+                      destination={
+                        selectedDonation.coordinates || {
+                          lat: -26.2041,
+                          lng: 28.0473,
+                        }
+                      }
+                      originLabel="Your Location"
+                      destinationLabel={
+                        selectedDonation.listingCompany ||
+                        selectedDonation.donorName ||
+                        "Donor"
+                      }
+                      originIcon="👤"
+                      destinationIcon="🏪"
+                      mapContainerStyle={{ width: "100%", height: "300px" }}
+                      zoom={12}
+                      showRouteInfo={true}
+                      autoShowRoute={true}
+                      className="donation-route-map"
+                    />
+                    <div
+                      style={{
+                        marginTop: "10px",
+                        padding: "10px",
+                        backgroundColor: "#f8f9fa",
+                        borderRadius: "6px",
+                        fontSize: "14px",
+                      }}
+                    >
+                      <p>
+                        <strong>Collection Address:</strong>{" "}
+                        {selectedDonation.address ||
+                          selectedDonation.location ||
+                          "Address not specified"}
+                      </p>
+                      <p>
+                        <strong>Food Type:</strong>{" "}
+                        {selectedDonation.foodType || "Food Donation"}
+                      </p>
+                      <p>
+                        <strong>Contact:</strong>{" "}
+                        {selectedDonation.contactPerson || "N/A"}{" "}
+                        {selectedDonation.contactPhone
+                          ? `(${selectedDonation.contactPhone})`
+                          : ""}
+                      </p>
                     </div>
                   </div>
                 </div>
