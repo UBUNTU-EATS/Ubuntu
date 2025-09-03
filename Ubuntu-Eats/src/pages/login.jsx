@@ -12,46 +12,63 @@ const Login = ({ isActive, onNoAccountClick }) => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
+const handleLogin = async (e) => {
+  e.preventDefault();
+  setError("");
+  setLoading(true);
 
-    try {
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
-      const user = userCredential.user;
+  try {
+    // Sign in with Firebase Auth
+    await signInWithEmailAndPassword(auth, email, password);
 
-      const userRef = doc(db, "users", email);
-      const userSnap = await getDoc(userRef);
+    // Get user data from Firestore
+    const userRef = doc(db, "users", email); // using email as doc ID
+    const userSnap = await getDoc(userRef);
 
-      if (userSnap.exists()) {
-        const userData = userSnap.data();
-        const role = userData.role;
-
-        if (role === "individual" || role === "company") {
-          navigate("/donor-dashboard");
-        } else if (role === "farmer") {
-          navigate("/farmers-dashboard");
-        } else if (role === "volunteer") {
-          navigate("/VolunteerDashboard");
-        } else if (role === "ngo") {
-          navigate("/NGODashboard");
-        } else {
-          setError("Unknown role. Please contact admin.");
-        }
-      } else {
-        setError("User data not found.");
-      }
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+    if (!userSnap.exists()) {
+      setError("User data not found.");
+      return;
     }
-  };
+
+    const userData = userSnap.data();
+    
+    // Check status first
+    if (userData.status === "pending") {
+      alert("Awaiting Admin approval");
+      return; // stop login flow
+    }
+
+    const role = userData.role; // role is now a single field
+
+    // Redirect based on role
+    switch (role) {
+      case "individual":
+      case "company":
+        navigate("/donor-dashboard");
+        break;
+      case "volunteer":
+        navigate("/VolunteerDashboard");
+        break;
+      case "admin":
+        navigate("/AdminDashboard");
+        break;
+      case "ngo":
+        navigate("/NGODashboard");
+        break;
+      case "farmer":
+        navigate("/farmers-dashboard");
+        break;
+      default:
+        setError("Unknown role. Please contact admin.");
+        break;
+    }
+  } catch (err) {
+    setError(err.message);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <section className="login-container">
@@ -87,7 +104,7 @@ const Login = ({ isActive, onNoAccountClick }) => {
           href="#"
           onClick={(e) => {
             e.preventDefault();
-            onNoAccountClick(); // triggers parent to switch form
+            onNoAccountClick();
           }}
         >
           Sign Up

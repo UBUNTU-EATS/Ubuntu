@@ -109,19 +109,7 @@ const UnifiedSignup = ({ onAlreadyHaveAccountClick }) => {
       );
       const user = userCredential.user;
 
-      // Determine donor/recipient flags
-      let isDonor = false;
-      let isRecipient = false;
-
-      if (accountType === "individual" || accountType === "company") {
-        isDonor = true;
-      } else if (accountType === "farmer") {
-        isDonor = true;
-        isRecipient = true;
-      } else if (accountType === "ngo") {
-        isRecipient = true;
-      } // volunteer stays false for both
-
+      // Create userData object with only 'role'
       const userData = {
         role: accountType,
         name: formData.name,
@@ -130,10 +118,8 @@ const UnifiedSignup = ({ onAlreadyHaveAccountClick }) => {
         address: formData.address,
         city: formData.city,
         country: formData.country,
-        isDonor,
-        isRecipient,
         createdAt: serverTimestamp(),
-        status: "pending",
+        status: "pending", // for admin verification
       };
 
       // Add role-specific fields
@@ -196,6 +182,7 @@ const UnifiedSignup = ({ onAlreadyHaveAccountClick }) => {
       setLoading(false);
     }
   };
+
   return (
     <section className="signup-container">
       <h2 className="signup-title">Create Account</h2>
@@ -217,6 +204,8 @@ const UnifiedSignup = ({ onAlreadyHaveAccountClick }) => {
         </select>
       </div>
 
+      {/* The rest of the form remains the same */}
+      {/* ... */}
       <form onSubmit={handleSubmit} className="signup-form">
         {/* Basic fields */}
         <div className="form-section">

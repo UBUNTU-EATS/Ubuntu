@@ -1,9 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import VolunteerProfile from "./VolunteerProfile";
 import AvailableDeliveries from "./AvailableDeliveries";
 import MyDeliveries from "./MyDeliveries";
 import "../styles/VolunteerDashboard.css";
-
+import LoadingDots from "./loading";
 const VolunteerDashboard = () => {
   const [activeTab, setActiveTab] = useState("available");
   const [volunteerData, setVolunteerData] = useState({
@@ -16,7 +16,15 @@ const VolunteerDashboard = () => {
     maxDistance: "25 km",
     completedDeliveries: 12,
   });
+    const [loading, setLoading] = useState(true);
 
+  useEffect(() => {
+    // Simulate loading data
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, []);
   // Mock data for available deliveries
   const [availableDeliveries, setAvailableDeliveries] = useState([
     {
@@ -136,6 +144,14 @@ const VolunteerDashboard = () => {
       setAvailableDeliveries((prev) => [...prev, availableDelivery]);
     }
   };
+
+  if (loading) {
+    return (
+      <section className="loading">
+        <LoadingDots numDots={10} radius={60} speed={0.6} size={20} />
+      </section>
+    );
+  }
 
   return (
     <div className="volunteer-dashboard">

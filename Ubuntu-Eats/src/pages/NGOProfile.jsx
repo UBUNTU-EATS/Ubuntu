@@ -76,7 +76,7 @@ const NGOProfile = () => {
   if (loading) return <p>Loading NGO Profile...</p>;
   if (!ngoData) return <p>No NGO profile found.</p>;
 
-  const verified = ngoData.status === "verified";
+  const approved = ngoData.status === "approved";
 
   return (
     <div className="ngo-profile">
@@ -292,13 +292,13 @@ const NGOProfile = () => {
               <div className="verification-status">
                 <div
                   className={`status-badge ${
-                    verified ? "verified" : "pending"
+                    approved ? "verified" : "pending"
                   }`}
                 >
-                  <span className="status-icon">{verified ? "✅" : "⌛"}</span>
-                  {verified ? "Verified Organization" : "Verification Pending"}
+                  <span className="status-icon">{approved ? "✅" : "⌛"}</span>
+                  {approved ? "Verified Organization" : "Verification Pending"}
                 </div>
-                {!verified && (
+                {!approved && (
                   <p className="status-note">
                     Your organization is awaiting admin verification.
                   </p>
