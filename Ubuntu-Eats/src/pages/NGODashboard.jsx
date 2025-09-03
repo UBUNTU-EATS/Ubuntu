@@ -13,12 +13,12 @@ import {
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { db, auth } from "../../firebaseConfig";
-import NGOProfile from "./NGOProfile";
-import ActiveDonations from "./ActiveDonations";
-import ClaimedDonations from "./ClaimedDonations";
-import "../styles/NGODashboard.css";
-import LoadingDots from "./loading";
 import { useNavigate } from "react-router-dom";
+import NGOProfile from "./NGOProfile";
+import AvailableDonations from "./AvailableDonations";
+import ClaimedDonations from "./ClaimedDonations";
+import LoadingDots from "./loading";
+import "../styles/NGODashboard.css";
 
 const NGODashboard = () => {
   const [activeTab, setActiveTab] = useState("available");
@@ -35,7 +35,8 @@ const NGODashboard = () => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setAuthLoading(false);
       if (user) {
-        fetchNGOData(user);
+        setUserEmail(user.email);
+        fetchNGODataAndDonations(user);
       } else {
         navigate("/"); // Redirect if not authenticated
       }
@@ -44,33 +45,90 @@ const NGODashboard = () => {
     return () => unsubscribe(); // Cleanup listener
   }, [navigate]);
 
-  const fetchNGOData = async (user) => {
+  // Fetch NGO data and donations
+  const fetchNGODataAndDonations = async (user) => {
     try {
       setLoading(true);
 
-      const docRef = doc(db, "users", user.email);
-      const docSnap = await getDoc(docRef);
-
-      if (!docSnap.exists()) {
-        console.warn("No NGO data found!");
-        navigate("/"); // No document
+      // Check if user is NGO
+      const userDocRef = doc(db, "users", user.email);
+      const userDoc = await getDoc(userDocRef);
+      
+      if (!userDoc.exists()) {
+        console.error("NGO data not found for email:", user.email);
+        navigate("/");
         return;
       }
 
-      const data = docSnap.data();
-
-      if (data.role !== "ngo") {
+      const userData = userDoc.data();
+      if (userData.role !== "ngo") {
         console.warn("User is not an NGO!");
-        navigate("/"); 
+        navigate("/");
         return;
       }
 
-      setNgoData(data);
-      setUserEmail(user.email);
+      setNgoData(userData);
+
+      // Fetch available donations (UNCLAIMED status)
+      const availableQuery = query(
+        collection(db, "foodListings"),
+        where("listingStatus", "==", "UNCLAIMED")
+      );
+
+      const availableUnsubscribe = onSnapshot(availableQuery, (snapshot) => {
+        const donations = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setAvailableDonations(donations);
+      });
+
+      // Fetch claimed donations by this NGO
+      const claimedQuery = query(
+        collection(db, "claims"),
+        where("ngoEmail", "==", user.email)
+      );
+
+      const claimedUnsubscribe = onSnapshot(claimedQuery, async (snapshot) => {
+        const claims = snapshot.docs.map((doc) => ({
+          claimId: doc.id,
+          ...doc.data(),
+        }));
+
+        // Get the actual donation data for each claim
+        const claimedDonationsData = await Promise.all(
+          claims.map(async (claim) => {
+            try {
+              const donationDoc = await getDoc(
+                doc(db, "foodListings", claim.listingId)
+              );
+              if (donationDoc.exists()) {
+                return {
+                  ...claim,
+                  ...donationDoc.data(),
+                  claimId: claim.claimId,
+                };
+              }
+              return claim;
+            } catch (error) {
+              console.error("Error fetching donation data:", error);
+              return claim;
+            }
+          })
+        );
+
+        setClaimedDonations(claimedDonationsData);
+        setLoading(false);
+      });
+
+      // Store unsubscribe functions for cleanup
+      return () => {
+        availableUnsubscribe();
+        claimedUnsubscribe();
+      };
     } catch (error) {
       console.error("Error fetching NGO data:", error);
-      navigate("/"); // On error, redirect
-    } finally {
+      navigate("/");
       setLoading(false);
     }
   };
@@ -262,7 +320,7 @@ const NGODashboard = () => {
         )}
 
         {activeTab === "available" && (
-          <ActiveDonations
+          <AvailableDonations
             donations={availableDonations}
             onClaim={claimDonation}
           />
