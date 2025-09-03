@@ -13,7 +13,7 @@ import {
 } from "firebase/firestore";
 import { db, auth } from "../../firebaseConfig";
 import NGOProfile from "./NGOProfile";
-import AvailableDonations from "./AvailableDonations";
+import ActiveDonations from "./ActiveDonations";
 import ClaimedDonations from "./ClaimedDonations";
 import "../styles/NGODashboard.css";
 import LoadingDots from "./loading";
@@ -47,8 +47,8 @@ const NGODashboard = () => {
 
       const data = docSnap.data();
 
-      if (!data.isRecipient) {
-        console.warn("User is not a recipient!");
+      if (data.role !== "ngo") {
+        console.warn("User is not an NGO!");
         navigate("/"); 
         return;
       }
@@ -246,7 +246,7 @@ if (loading) {
         )}
 
         {activeTab === "available" && (
-          <AvailableDonations
+          <ActiveDonations
             donations={availableDonations}
             onClaim={claimDonation}
           />

@@ -75,7 +75,7 @@ const VolunteerProfile = () => {
   if (loading) return <p>Loading Volunteer Profile...</p>;
   if (!volunteerData) return <p>No volunteer profile found.</p>;
 
-  const verified = volunteerData.status === "verified";
+  const approved = volunteerData.status === "approved";
 
   return (
     <div className="volunteer-profile">
@@ -275,11 +275,11 @@ const VolunteerProfile = () => {
                   className={`status-badge ${verified ? "verified" : "pending"}`}
                 >
                   <span className="status-icon">
-                    {verified ? "✅" : "⌛"}
+                    {approved ? "✅" : "⌛"}
                   </span>
-                  {verified ? "Verified Volunteer" : "Verification Pending"}
+                  {approved ? "Verified Volunteer" : "Verification Pending"}
                 </div>
-                {!verified && (
+                {!approved && (
                   <p className="status-note">
                     Your volunteer account is awaiting admin verification.
                   </p>

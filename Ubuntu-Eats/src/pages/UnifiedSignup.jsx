@@ -109,39 +109,18 @@ const UnifiedSignup = ({ onAlreadyHaveAccountClick }) => {
       );
       const user = userCredential.user;
 
-      // Determine donor/recipient/admin/volunteer flags
-let isDonor = false;
-let isRecipient = false;
-let isAdmin = false; // everyone starts as false
-let isVolunteer = false;
-
-if (accountType === "individual" || accountType === "company") {
-  isDonor = true;
-} else if (accountType === "farmer") {
-  isDonor = true;
-  isRecipient = true;
-} else if (accountType === "ngo") {
-  isRecipient = true;
-} else if (accountType === "volunteer") {
-  isVolunteer = true;
-}
-
-// Create userData object
-const userData = {
-  role: accountType,
-  name: formData.name,
-  email: formData.email,
-  phone: formData.phone,
-  address: formData.address,
-  city: formData.city,
-  country: formData.country,
-  isDonor,
-  isRecipient,
-  isAdmin,
-  isVolunteer,
-  createdAt: serverTimestamp(),
-  status: "pending",
-};
+      // Create userData object with only 'role'
+      const userData = {
+        role: accountType,
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        address: formData.address,
+        city: formData.city,
+        country: formData.country,
+        createdAt: serverTimestamp(),
+        status: "pending", // for admin verification
+      };
 
       // Add role-specific fields
       if (accountType === "individual") {
@@ -203,6 +182,7 @@ const userData = {
       setLoading(false);
     }
   };
+
   return (
     <section className="signup-container">
       <h2 className="signup-title">Create Account</h2>
@@ -224,6 +204,8 @@ const userData = {
         </select>
       </div>
 
+      {/* The rest of the form remains the same */}
+      {/* ... */}
       <form onSubmit={handleSubmit} className="signup-form">
         {/* Basic fields */}
         <div className="form-section">

@@ -18,11 +18,11 @@ const handleLogin = async (e) => {
   setLoading(true);
 
   try {
-    // Sign in
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    // Sign in with Firebase Auth
+    await signInWithEmailAndPassword(auth, email, password);
 
     // Get user data from Firestore
-    const userRef = doc(db, "users", email); // use email as ID
+    const userRef = doc(db, "users", email); // using email as doc ID
     const userSnap = await getDoc(userRef);
 
     if (!userSnap.exists()) {
@@ -31,29 +31,36 @@ const handleLogin = async (e) => {
     }
 
     const userData = userSnap.data();
-
-    // Determine roles from boolean flags
-    const roles = [];
-    if (userData.isDonor) roles.push("donor");
-    if (userData.isRecipient) roles.push("recipient");
-    if (userData.isAdmin) roles.push("admin");
-    if (userData.isVolunteer) roles.push("volunteer");
-
-    if (!roles.length) {
-      setError("No roles assigned. Please contact admin.");
-      return;
+    
+    // Check status first
+    if (userData.status === "pending") {
+      alert("Awaiting Admin approval");
+      return; // stop login flow
     }
 
-    // Redirect based on roles
-    if (roles.length > 1) {
-      navigate("/choicePage", { state: { roles } });
-    } else {
-      const role = roles[0];
-      if (role === "donor") navigate("/donor-dashboard");
-      else if (role === "volunteer") navigate("/VolunteerDashboard");
-      else if (role === "admin") navigate("/AdminDashboard");
-      else if (role === "recipient") navigate("/RecipientDashboard");
-      else setError("Unknown role. Please contact admin.");
+    const role = userData.role; // role is now a single field
+
+    // Redirect based on role
+    switch (role) {
+      case "individual":
+      case "company":
+        navigate("/donor-dashboard");
+        break;
+      case "volunteer":
+        navigate("/VolunteerDashboard");
+        break;
+      case "admin":
+        navigate("/AdminDashboard");
+        break;
+      case "ngo":
+        navigate("/NGODashboard");
+        break;
+      case "farmer":
+        navigate("/farmers-dashboard");
+        break;
+      default:
+        setError("Unknown role. Please contact admin.");
+        break;
     }
   } catch (err) {
     setError(err.message);
@@ -61,6 +68,7 @@ const handleLogin = async (e) => {
     setLoading(false);
   }
 };
+
 
   return (
     <section className="login-container">

@@ -32,10 +32,10 @@ const DonorProfile = ({
         <div className="profile-info">
           <h2>{isCompany ? donorData.companyName : donorData.name}</h2>
           <span className="donor-type">{isCompany ? "Business Account" : "Individual Donor"}</span>
-          {donorData.status === "verified" ? (
-            <span className="verification-badge verified">Verified</span>
+          {donorData.status === "approved" ? (
+            <span className="verification-badge verified"> Verified</span>
           ) : (
-            <span className="verification-badge pending">Verification Pending</span>
+            <span className="verification-badge pending"> Verification Pending</span>
           )}
         </div>
 
