@@ -3,6 +3,7 @@ import DonorProfile from "./DonorProfile";
 import DonationForm from "./DonorForm";
 import ActiveDonations from "./ActiveDonations";
 import "../styles/DonorDashboard.css";
+import LoadingDots from "./loading";
 import { db, auth } from "../../firebaseConfig";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
@@ -117,7 +118,11 @@ const DonorDashboard = () => {
     }
   };
 
-  if (loading) return <div className="dashboard-loading">Loading dashboard...</div>;
+  if (loading) return (
+      <section className="loading">
+        <LoadingDots numDots={10} radius={60} speed={0.6} size={20} />
+      </section>
+    );
   if (!donorData) return <div className="dashboard-error">Error loading dashboard data.</div>;
 
   const isCompany = donorData.role === "company";

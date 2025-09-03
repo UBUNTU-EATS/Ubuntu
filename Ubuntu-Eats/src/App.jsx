@@ -13,7 +13,7 @@ import MyDeliveries from "./pages/MyDeliveries";
 import AvailableDeliveries from "./pages/AvailableDeliveries";
 
 import DonorDashboard from "./pages/DonorDashboard";
-
+import ChoicePage from "./pages/choicePage";
 
 import AuthContainer from "./pages/AuthContainer";
 import NGODashboard from "./pages/NGODashboard";
@@ -45,7 +45,7 @@ function App() {
 
 
 
-
+        <Route path="/choicePage" element={<ChoicePage />} />
         <Route path="/NGOProfile" element={<NGOProfile />} />
         <Route path="/ClaimedDonations" element={<ClaimedDonations />} />
 

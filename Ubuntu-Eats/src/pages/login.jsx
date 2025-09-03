@@ -12,46 +12,55 @@ const Login = ({ isActive, onNoAccountClick }) => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
+const handleLogin = async (e) => {
+  e.preventDefault();
+  setError("");
+  setLoading(true);
 
-    try {
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
-      const user = userCredential.user;
+  try {
+    // Sign in
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
 
-      const userRef = doc(db, "users", email);
-      const userSnap = await getDoc(userRef);
+    // Get user data from Firestore
+    const userRef = doc(db, "users", email); // use email as ID
+    const userSnap = await getDoc(userRef);
 
-      if (userSnap.exists()) {
-        const userData = userSnap.data();
-        const role = userData.role;
-
-        if (role === "individual" || role === "company") {
-          navigate("/donor-dashboard");
-        } else if (role === "farmer") {
-          navigate("/farmers-dashboard");
-        } else if (role === "volunteer") {
-          navigate("/VolunteerDashboard");
-        } else if (role === "ngo") {
-          navigate("/NGODashboard");
-        } else {
-          setError("Unknown role. Please contact admin.");
-        }
-      } else {
-        setError("User data not found.");
-      }
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+    if (!userSnap.exists()) {
+      setError("User data not found.");
+      return;
     }
-  };
+
+    const userData = userSnap.data();
+
+    // Determine roles from boolean flags
+    const roles = [];
+    if (userData.isDonor) roles.push("donor");
+    if (userData.isRecipient) roles.push("recipient");
+    if (userData.isAdmin) roles.push("admin");
+    if (userData.isVolunteer) roles.push("volunteer");
+
+    if (!roles.length) {
+      setError("No roles assigned. Please contact admin.");
+      return;
+    }
+
+    // Redirect based on roles
+    if (roles.length > 1) {
+      navigate("/choicePage", { state: { roles } });
+    } else {
+      const role = roles[0];
+      if (role === "donor") navigate("/donor-dashboard");
+      else if (role === "volunteer") navigate("/VolunteerDashboard");
+      else if (role === "admin") navigate("/AdminDashboard");
+      else if (role === "recipient") navigate("/RecipientDashboard");
+      else setError("Unknown role. Please contact admin.");
+    }
+  } catch (err) {
+    setError(err.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <section className="login-container">
@@ -87,7 +96,7 @@ const Login = ({ isActive, onNoAccountClick }) => {
           href="#"
           onClick={(e) => {
             e.preventDefault();
-            onNoAccountClick(); // triggers parent to switch form
+            onNoAccountClick();
           }}
         >
           Sign Up

@@ -13,12 +13,6 @@ const LandingPage = () => {
         <div className="nav-links">
           <a href="#about">About</a>
           <a href="#features">Features</a>
-          <Link
-            to="/donor-dashboard"
-            style={{ color: "white", textDecoration: "none" }}
-          >
-            Donor Portal
-          </Link>
           <a href="#join">Get Started</a>
         </div>
       </nav>
@@ -33,7 +27,7 @@ const LandingPage = () => {
 
         <button
           className="cta-btn"
-          onClick={() => navigate("/donor-dashboard")}
+          onClick={() => navigate("/AuthContainer")}
         >
           Join the Movement
         </button>

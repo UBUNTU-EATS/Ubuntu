@@ -109,32 +109,39 @@ const UnifiedSignup = ({ onAlreadyHaveAccountClick }) => {
       );
       const user = userCredential.user;
 
-      // Determine donor/recipient flags
-      let isDonor = false;
-      let isRecipient = false;
+      // Determine donor/recipient/admin/volunteer flags
+let isDonor = false;
+let isRecipient = false;
+let isAdmin = false; // everyone starts as false
+let isVolunteer = false;
 
-      if (accountType === "individual" || accountType === "company") {
-        isDonor = true;
-      } else if (accountType === "farmer") {
-        isDonor = true;
-        isRecipient = true;
-      } else if (accountType === "ngo") {
-        isRecipient = true;
-      } // volunteer stays false for both
+if (accountType === "individual" || accountType === "company") {
+  isDonor = true;
+} else if (accountType === "farmer") {
+  isDonor = true;
+  isRecipient = true;
+} else if (accountType === "ngo") {
+  isRecipient = true;
+} else if (accountType === "volunteer") {
+  isVolunteer = true;
+}
 
-      const userData = {
-        role: accountType,
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        address: formData.address,
-        city: formData.city,
-        country: formData.country,
-        isDonor,
-        isRecipient,
-        createdAt: serverTimestamp(),
-        status: "pending",
-      };
+// Create userData object
+const userData = {
+  role: accountType,
+  name: formData.name,
+  email: formData.email,
+  phone: formData.phone,
+  address: formData.address,
+  city: formData.city,
+  country: formData.country,
+  isDonor,
+  isRecipient,
+  isAdmin,
+  isVolunteer,
+  createdAt: serverTimestamp(),
+  status: "pending",
+};
 
       // Add role-specific fields
       if (accountType === "individual") {
