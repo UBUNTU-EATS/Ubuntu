@@ -1,16 +1,49 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { db } from "../../firebaseConfig";
+import RouteMap from "./RouteMap";
 import "../styles/MyDeliveries.css";
 
-const MyDeliveries = ({ deliveries, onConfirmDelivery, onCancelDelivery }) => {
-  const [activeFilter, setActiveFilter] = useState("active");
+const MyDeliveries = ({
+  deliveries,
+  onConfirmDelivery,
+  onCancelDelivery,
+  onCompleteDelivery,
+  onOpenChat,
+}) => {
+  const [activeFilter, setActiveFilter] = useState("all");
+  const [processing, setProcessing] = useState(null);
+  const [selectedDelivery, setSelectedDelivery] = useState(null);
+  const [userLocation, setUserLocation] = useState({
+    lat: -26.2041,
+    lng: 28.0473,
+  }); // Default to Johannesburg
+
+  // Get user's current location
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          });
+        },
+        (error) => {
+          console.log("Geolocation error:", error);
+        }
+      );
+    }
+  }, []);
 
   const filteredDeliveries = deliveries.filter((delivery) => {
     if (activeFilter === "all") return true;
     return delivery.status === activeFilter;
   });
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
+  const formatDate = (timestamp) => {
+    if (!timestamp) return "N/A";
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
     return date.toLocaleDateString("en-ZA", {
       day: "2-digit",
       month: "short",
@@ -19,42 +52,50 @@ const MyDeliveries = ({ deliveries, onConfirmDelivery, onCancelDelivery }) => {
     });
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "accepted":
-        return "status-accepted";
-      case "delivered":
-        return "status-delivered";
-      case "cancelled":
-        return "status-cancelled";
-      default:
-        return "status-accepted";
-    }
-  };
-
-  const getStatusText = (status) => {
-    switch (status) {
-      case "accepted":
-        return "In Progress";
-      case "delivered":
-        return "Delivered";
-      case "cancelled":
-        return "Cancelled";
-      default:
-        return status;
-    }
+  const getStatusConfig = (status) => {
+    const configs = {
+      ASSIGNED: {
+        color: "#f59e0b",
+        bg: "#fef3c7",
+        icon: "🔄",
+        label: "In Progress",
+      },
+      PICKED_UP: {
+        color: "#3b82f6",
+        bg: "#dbeafe",
+        icon: "📦",
+        label: "Picked Up",
+      },
+      DELIVERED: {
+        color: "#059669",
+        bg: "#a7f3d0",
+        icon: "✅",
+        label: "Delivered",
+      },
+      CANCELLED: {
+        color: "#ef4444",
+        bg: "#fecaca",
+        icon: "❌",
+        label: "Cancelled",
+      },
+    };
+    return configs[status] || configs["ASSIGNED"];
   };
 
   const getCategoryIcon = (category) => {
-    switch (category) {
-      case "fresh-meals":
+    if (!category) return "📦";
+    switch (category.toLowerCase()) {
+      case "fresh meals":
         return "🍽️";
-      case "bakery":
+      case "baked goods":
         return "🥐";
+      case "fruits & vegetables":
       case "fruits-vegetables":
         return "🥦";
+      case "dairy products":
       case "dairy":
         return "🥛";
+      case "packaged food":
       case "packaged-goods":
         return "📦";
       case "beverages":
@@ -64,231 +105,599 @@ const MyDeliveries = ({ deliveries, onConfirmDelivery, onCancelDelivery }) => {
     }
   };
 
-  const getUrgencyColor = (urgency) => {
-    switch (urgency) {
-      case "high":
-        return "urgent";
-      case "medium":
-        return "warning";
-      case "low":
-        return "normal";
-      default:
-        return "normal";
+  const getCategoryLabel = (category) => {
+    if (!category) return "Unknown";
+    return category.replace(/-/g, " ");
+  };
+
+  const handleConfirmDelivery = async (deliveryId, claimId, listingId) => {
+    setProcessing(deliveryId);
+    try {
+      await onConfirmDelivery(deliveryId, claimId, listingId);
+    } catch (error) {
+      console.error("Error confirming delivery:", error);
+      alert("Failed to confirm delivery. Please try again.");
+    } finally {
+      setProcessing(null);
     }
   };
 
-  return (
-    <div className="my-deliveries">
-      <div className="section-header">
-        <h2>My Deliveries</h2>
-        <p>Manage your accepted food deliveries</p>
-      </div>
+  const handleCancelDelivery = async (delivery) => {
+    setProcessing(delivery.deliveryId);
+    try {
+      // Update delivery assignment status to CANCELLED
+      const deliveryRef = doc(db, "deliveryAssignments", delivery.deliveryId);
+      await updateDoc(deliveryRef, {
+        status: "CANCELLED",
+        cancelledAt: new Date(),
+        updatedAt: new Date(),
+      });
 
-      {/* Filter Tabs */}
-      <div className="filter-tabs">
-        <button
-          className={`filter-tab ${activeFilter === "all" ? "active" : ""}`}
-          onClick={() => setActiveFilter("all")}
-        >
-          All Deliveries ({deliveries.length})
-        </button>
-        <button
-          className={`filter-tab ${
-            activeFilter === "accepted" ? "active" : ""
-          }`}
-          onClick={() => setActiveFilter("accepted")}
-        >
-          Active ({deliveries.filter((d) => d.status === "accepted").length})
-        </button>
-        <button
-          className={`filter-tab ${
-            activeFilter === "delivered" ? "active" : ""
-          }`}
-          onClick={() => setActiveFilter("delivered")}
-        >
-          Completed ({deliveries.filter((d) => d.status === "delivered").length}
-          )
-        </button>
+      // Update the claim to remove volunteer assignment
+      const claimRef = doc(db, "claims", delivery.claimId);
+      await updateDoc(claimRef, {
+        volunteerAssigned: null,
+        volunteerAssignedAt: null,
+        status: "CLAIMED", // Reset to claimed status
+        updatedAt: new Date(),
+      });
+
+      // Show success message
+      alert(
+        "Delivery cancelled successfully. It's now available for other volunteers."
+      );
+
+      // Close the details modal
+      setSelectedDelivery(null);
+    } catch (error) {
+      console.error("Error canceling delivery:", error);
+      alert("Failed to cancel delivery. Please try again.");
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  const handleCompleteDelivery = async (delivery) => {
+    setProcessing(delivery.deliveryId);
+    try {
+      // Update delivery assignment status to DELIVERED
+      const deliveryRef = doc(db, "deliveryAssignments", delivery.deliveryId);
+      await updateDoc(deliveryRef, {
+        status: "DELIVERED",
+        deliveredAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      // Update the claim status to COLLECTED
+      const claimRef = doc(db, "claims", delivery.claimId);
+      await updateDoc(claimRef, {
+        status: "COLLECTED",
+        collectedAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      // Update the food listing status to COLLECTED
+      const listingRef = doc(db, "foodListings", delivery.listingId);
+      await updateDoc(listingRef, {
+        listingStatus: "COLLECTED",
+        updatedAt: new Date(),
+      });
+
+      // Show success message
+      alert("Delivery marked as completed successfully!");
+
+      // Close the details modal
+      setSelectedDelivery(null);
+    } catch (error) {
+      console.error("Error completing delivery:", error);
+      alert("Failed to complete delivery. Please try again.");
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  const handleOpenChat = (delivery) => {
+    if (onOpenChat) {
+      onOpenChat(delivery);
+    }
+  };
+
+  // Calculate statistics for header
+  const totalDeliveries = deliveries.length;
+  const activeDeliveries = deliveries.filter(
+    (d) => d.status === "ASSIGNED" || d.status === "PICKED_UP"
+  ).length;
+  const completedDeliveries = deliveries.filter(
+    (d) => d.status === "DELIVERED"
+  ).length;
+
+  return (
+    <div className="modern-my-deliveries">
+      {/* Controls Section */}
+      <div className="deliveries-controls">
+        <div className="filter-section">
+          <div className="filter-pills">
+            {[
+              { key: "all", label: "All Deliveries", count: totalDeliveries },
+              { key: "ASSIGNED", label: "Active", count: activeDeliveries },
+              {
+                key: "DELIVERED",
+                label: "Completed",
+                count: completedDeliveries,
+              },
+            ].map((filter) => (
+              <button
+                key={filter.key}
+                className={`filter-pill ${
+                  activeFilter === filter.key ? "active" : ""
+                }`}
+                onClick={() => setActiveFilter(filter.key)}
+              >
+                {filter.label}
+                <span className="pill-count">{filter.count}</span>
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Deliveries List */}
       {filteredDeliveries.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-icon">📋</div>
+        <div className="empty-container">
+          <div className="empty-illustration">🚗</div>
           <h3>No deliveries found</h3>
           <p>
             {activeFilter === "all"
               ? "You haven't accepted any deliveries yet. Check available deliveries to get started."
-              : `No deliveries with status "${getStatusText(
-                  activeFilter
-                )}" found.`}
+              : `No ${
+                  activeFilter === "ASSIGNED" ? "active" : "completed"
+                } deliveries found.`}
           </p>
         </div>
       ) : (
-        <div className="deliveries-list">
-          {filteredDeliveries.map((delivery) => (
-            <div key={delivery.id} className="delivery-card">
-              <div className="card-header">
-                <div className="delivery-info">
-                  <h3>{delivery.foodType}</h3>
-                  <span className="accepted-date">
-                    Accepted on {formatDate(delivery.acceptedAt)}
-                  </span>
-                </div>
-                <div className="status-section">
-                  <span
-                    className={`status-badge ${getStatusColor(
-                      delivery.status
-                    )}`}
-                  >
-                    {getStatusText(delivery.status)}
-                  </span>
-                  <div className="category-badge">
-                    {getCategoryIcon(delivery.category)}
-                    {delivery.category.replace("-", " ")}
-                  </div>
-                </div>
-              </div>
+        <div className="deliveries-grid">
+          {filteredDeliveries.map((delivery) => {
+            const statusConfig = getStatusConfig(delivery.status);
 
-              <div className="card-content">
-                <div className="delivery-details">
-                  <div className="detail-item">
-                    <span className="detail-label">From:</span>
-                    <span className="detail-value">{delivery.donorName}</span>
-                  </div>
-                  <div className="detail-item">
-                    <span className="detail-label">To:</span>
-                    <span className="detail-value">
-                      {delivery.recipientName}
-                    </span>
-                  </div>
-                  <div className="detail-item">
-                    <span className="detail-label">Quantity:</span>
-                    <span className="detail-value">{delivery.quantity}</span>
-                  </div>
-                </div>
-
-                <div className="delivery-meta">
-                  <div className="meta-item">
-                    <span className="meta-label">📅 Pickup Time:</span>
-                    <span className="meta-value">
-                      {formatDate(delivery.pickupTime)}
+            return (
+              <div key={delivery.deliveryId} className="delivery-card">
+                {/* Header Section */}
+                <div className="card-header">
+                  <div className="delivery-title">
+                    <h3>{delivery.foodType}</h3>
+                    <span className="delivery-date">
+                      Accepted on {formatDate(delivery.assignedAt)}
                     </span>
                   </div>
 
-                  <div className="meta-item">
-                    <span className="meta-label">📍 Pickup Location:</span>
-                    <span className="meta-value">
-                      {delivery.pickupLocation}
-                    </span>
-                  </div>
-
-                  <div className="meta-item">
-                    <span className="meta-label">🏠 Delivery Location:</span>
-                    <span className="meta-value">
-                      {delivery.deliveryLocation}
-                    </span>
-                  </div>
-
-                  <div className="meta-item">
-                    <span className="meta-label">📏 Distance:</span>
-                    <span className="meta-value">{delivery.distance} km</span>
-                  </div>
-
-                  <div className="meta-item">
-                    <span className="meta-label">⏱️ Est. Time:</span>
-                    <span className="meta-value">
-                      {delivery.estimatedDeliveryTime}
-                    </span>
-                  </div>
-
-                  <div className="meta-item">
-                    <span className="meta-label">🚨 Urgency:</span>
+                  <div className="delivery-status">
                     <span
-                      className={`meta-value urgency-${getUrgencyColor(
-                        delivery.urgency
-                      )}`}
+                      className="status-dot"
+                      style={{ backgroundColor: statusConfig.color }}
+                    ></span>
+                    <span
+                      className="status-text"
+                      style={{ color: statusConfig.color }}
                     >
-                      {delivery.urgency.charAt(0).toUpperCase() +
-                        delivery.urgency.slice(1)}
+                      {statusConfig.label}
                     </span>
                   </div>
+                </div>
 
-                  {delivery.specialInstructions && (
-                    <div className="meta-item">
-                      <span className="meta-label">⚠️ Instructions:</span>
-                      <span className="meta-value">
-                        {delivery.specialInstructions}
+                {/* Content Section */}
+                <div className="card-content">
+                  <div className="delivery-details">
+                    <div className="detail-row">
+                      <span className="detail-icon">
+                        {getCategoryIcon(delivery.typeOfFood)}
                       </span>
+                      <span className="detail-text">
+                        {getCategoryLabel(delivery.typeOfFood)}
+                      </span>
+                    </div>
+
+                    <div className="detail-row">
+                      <span className="detail-icon">📦</span>
+                      <span className="detail-text">
+                        {delivery.quantity} {delivery.unit}
+                      </span>
+                    </div>
+
+                    <div className="detail-row">
+                      <span className="detail-icon">📍</span>
+                      <span className="detail-text">
+                        From: {delivery.listingCompany || delivery.donorName}
+                      </span>
+                    </div>
+
+                    <div className="detail-row">
+                      <span className="detail-icon">🏠</span>
+                      <span className="detail-text">
+                        To: {delivery.ngoName}
+                      </span>
+                    </div>
+
+                    <div className="detail-row">
+                      <span className="detail-icon">📅</span>
+                      <span className="detail-text">
+                        Pickup by {formatDate(delivery.collectBy)}
+                      </span>
+                    </div>
+
+                    {delivery.specialInstructions && (
+                      <div className="detail-row">
+                        <span className="detail-icon">⚠️</span>
+                        <span className="detail-text">
+                          {delivery.specialInstructions}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Progress Tracking */}
+                  {(delivery.status === "ASSIGNED" ||
+                    delivery.status === "PICKED_UP") && (
+                    <div className="progress-container">
+                      <div className="progress-steps">
+                        <div
+                          className={`progress-step ${
+                            delivery.status === "ASSIGNED" ||
+                            delivery.status === "PICKED_UP" ||
+                            delivery.status === "DELIVERED"
+                              ? "active"
+                              : ""
+                          }`}
+                        >
+                          <span className="step-number">1</span>
+                          <span className="step-label">Accepted</span>
+                        </div>
+                        <div className="progress-connector"></div>
+                        <div
+                          className={`progress-step ${
+                            delivery.status === "PICKED_UP" ||
+                            delivery.status === "DELIVERED"
+                              ? "active"
+                              : ""
+                          }`}
+                        >
+                          <span className="step-number">2</span>
+                          <span className="step-label">Picked Up</span>
+                        </div>
+                        <div className="progress-connector"></div>
+                        <div
+                          className={`progress-step ${
+                            delivery.status === "DELIVERED" ? "active" : ""
+                          }`}
+                        >
+                          <span className="step-number">3</span>
+                          <span className="step-label">Delivered</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {delivery.status === "DELIVERED" && delivery.deliveredAt && (
+                    <div className="completion-banner">
+                      <span className="completed-icon">✅</span>
+                      <div className="completion-details">
+                        <span className="completed-text">
+                          Successfully delivered!
+                        </span>
+                        <span className="completion-date">
+                          Delivered on {formatDate(delivery.deliveredAt)}
+                        </span>
+                      </div>
                     </div>
                   )}
                 </div>
 
-                {delivery.status === "accepted" && (
-                  <div className="delivery-progress">
-                    <div className="progress-steps">
-                      <div className="progress-step active">
-                        <span className="step-number">1</span>
-                        <span className="step-label">Accepted</span>
-                      </div>
-                      <div className="progress-connector"></div>
-                      <div className="progress-step">
-                        <span className="step-number">2</span>
-                        <span className="step-label">Picked Up</span>
-                      </div>
-                      <div className="progress-connector"></div>
-                      <div className="progress-step">
-                        <span className="step-number">3</span>
-                        <span className="step-label">Delivered</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                {/* Action Section */}
+                <div className="card-actions">
+                  <button
+                    className="action-btn outline"
+                    onClick={() => setSelectedDelivery(delivery)}
+                  >
+                    Details
+                  </button>
 
-                {delivery.status === "delivered" && delivery.deliveredAt && (
-                  <div className="delivery-completed">
-                    <div className="completion-info">
-                      <span className="completed-icon">✅</span>
-                      <span className="completed-text">
-                        Successfully delivered!
-                      </span>
-                      <span className="completion-date">
-                        Delivered on {formatDate(delivery.deliveredAt)}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="card-actions">
-                {delivery.status === "accepted" && (
-                  <>
+                  {/* Chat Button */}
+                  {(delivery.status === "ASSIGNED" ||
+                    delivery.status === "PICKED_UP") && (
                     <button
-                      className="action-btn secondary"
-                      onClick={() => onCancelDelivery(delivery.id)}
+                      className="action-btn chat"
+                      onClick={() => handleOpenChat(delivery)}
                     >
-                      Cancel Delivery
+                      💬 Chat
                     </button>
+                  )}
+
+                  {/* Action Buttons based on status */}
+                  {delivery.status === "ASSIGNED" && (
+                    <>
+                      <button
+                        className="action-btn secondary"
+                        onClick={() => handleCancelDelivery(delivery)}
+                        disabled={processing === delivery.deliveryId}
+                      >
+                        {processing === delivery.deliveryId
+                          ? "Canceling..."
+                          : "Cancel"}
+                      </button>
+                      <button
+                        className="action-btn primary"
+                        onClick={() =>
+                          handleConfirmDelivery(
+                            delivery.deliveryId,
+                            delivery.claimId,
+                            delivery.listingId
+                          )
+                        }
+                        disabled={processing === delivery.deliveryId}
+                      >
+                        {processing === delivery.deliveryId
+                          ? "Confirming..."
+                          : "Pick Up"}
+                      </button>
+                    </>
+                  )}
+
+                  {delivery.status === "PICKED_UP" && (
                     <button
                       className="action-btn primary"
-                      onClick={() => onConfirmDelivery(delivery.id)}
+                      onClick={() => handleCompleteDelivery(delivery)}
+                      disabled={processing === delivery.deliveryId}
                     >
-                      Confirm Delivery
+                      {processing === delivery.deliveryId
+                        ? "Completing..."
+                        : "Complete Delivery"}
                     </button>
-                  </>
-                )}
+                  )}
 
-                {delivery.status === "delivered" && (
-                  <div className="completion-actions">
-                    <button className="action-btn outline">View Details</button>
-                    <button className="action-btn outline">
-                      Share Feedback
-                    </button>
-                  </div>
-                )}
+                  {delivery.status === "DELIVERED" && (
+                    <div className="completed-actions">
+                      <button className="action-btn outline">
+                        View Details
+                      </button>
+                      <button className="action-btn outline">
+                        Share Feedback
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Details Modal with Map */}
+      {selectedDelivery && (
+        <div
+          className="modal-backdrop"
+          onClick={() => setSelectedDelivery(null)}
+        >
+          <div className="delivery-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Delivery Details</h2>
+              <button
+                className="modal-close"
+                onClick={() => setSelectedDelivery(null)}
+              >
+                ✕
+              </button>
             </div>
-          ))}
+
+            <div className="modal-content">
+              <div className="modal-section">
+                <h3>Food Information</h3>
+                <div className="info-grid">
+                  <div className="info-item">
+                    <span className="info-label">Food Type:</span>
+                    <span className="info-value">
+                      {selectedDelivery.foodType}
+                    </span>
+                  </div>
+                  <div className="info-item">
+                    <span className="info-label">Quantity:</span>
+                    <span className="info-value">
+                      {selectedDelivery.quantity} {selectedDelivery.unit}
+                    </span>
+                  </div>
+                  <div className="info-item">
+                    <span className="info-label">Category:</span>
+                    <span className="info-value">
+                      {getCategoryIcon(selectedDelivery.typeOfFood)}
+                      {getCategoryLabel(selectedDelivery.typeOfFood)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="modal-section">
+                <h3>Delivery Route</h3>
+                <div className="route-info">
+                  <div className="location-card">
+                    <span className="location-icon">📦</span>
+                    <div className="location-details">
+                      <span className="location-title">Pickup Location</span>
+                      <span className="location-name">
+                        {selectedDelivery.listingCompany ||
+                          selectedDelivery.donorName}
+                      </span>
+                      <span className="location-address">
+                        {selectedDelivery.address || selectedDelivery.location}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="route-connector">
+                    <div className="connector-line"></div>
+                    <span className="distance-badge">→ Delivery →</span>
+                  </div>
+
+                  <div className="location-card">
+                    <span className="location-icon">🏠</span>
+                    <div className="location-details">
+                      <span className="location-title">Delivery Location</span>
+                      <span className="location-name">
+                        {selectedDelivery.ngoName}
+                      </span>
+                      <span className="location-address">
+                        {selectedDelivery.ngoAddress || "Address not specified"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Map Section */}
+                <div className="map-section" style={{ marginTop: "15px" }}>
+                  <h4>Route to Delivery Point</h4>
+                  {selectedDelivery.coordinates && (
+                    <RouteMap
+                      origin={userLocation}
+                      destination={selectedDelivery.coordinates}
+                      originLabel="Your Location"
+                      destinationLabel={selectedDelivery.ngoName}
+                      originIcon="👤"
+                      destinationIcon="🏠"
+                      mapContainerStyle={{ width: "100%", height: "300px" }}
+                      zoom={12}
+                      showRouteInfo={true}
+                      autoShowRoute={true}
+                      className="delivery-route-map"
+                    />
+                  )}
+                  <div
+                    style={{
+                      marginTop: "10px",
+                      padding: "10px",
+                      backgroundColor: "#f8f9fa",
+                      borderRadius: "6px",
+                      fontSize: "14px",
+                    }}
+                  >
+                    <p>
+                      <strong>Delivery Address:</strong>{" "}
+                      {selectedDelivery.ngoAddress || "Address not specified"}
+                    </p>
+                    <p>
+                      <strong>Food Type:</strong> {selectedDelivery.foodType}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="modal-section">
+                <h3>Delivery Timeline</h3>
+                <div className="timeline-info">
+                  <div className="timeline-item">
+                    <span className="timeline-label">Accepted On:</span>
+                    <span className="timeline-value">
+                      {formatDate(selectedDelivery.assignedAt)}
+                    </span>
+                  </div>
+                  <div className="timeline-item">
+                    <span className="timeline-label">Pickup By:</span>
+                    <span className="timeline-value">
+                      {formatDate(selectedDelivery.collectBy)}
+                    </span>
+                  </div>
+                  {selectedDelivery.deliveredAt && (
+                    <div className="timeline-item">
+                      <span className="timeline-label">Delivered On:</span>
+                      <span className="timeline-value">
+                        {formatDate(selectedDelivery.deliveredAt)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="timeline-item">
+                    <span className="timeline-label">Status:</span>
+                    <span
+                      className="timeline-value status-indicator"
+                      style={{
+                        color: getStatusConfig(selectedDelivery.status).color,
+                      }}
+                    >
+                      {getStatusConfig(selectedDelivery.status).label}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {selectedDelivery.specialInstructions && (
+                <div className="modal-section">
+                  <h3>Special Instructions</h3>
+                  <div className="instructions-card">
+                    <p>{selectedDelivery.specialInstructions}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="modal-footer">
+              {/* Action buttons in modal footer */}
+              {selectedDelivery.status === "ASSIGNED" && (
+                <>
+                  <button
+                    className="modal-btn secondary"
+                    onClick={() => handleCancelDelivery(selectedDelivery)}
+                    disabled={processing === selectedDelivery.deliveryId}
+                  >
+                    {processing === selectedDelivery.deliveryId
+                      ? "Canceling..."
+                      : "Cancel Delivery"}
+                  </button>
+                  <button
+                    className="modal-btn primary"
+                    onClick={() =>
+                      handleConfirmDelivery(
+                        selectedDelivery.deliveryId,
+                        selectedDelivery.claimId,
+                        selectedDelivery.listingId
+                      )
+                    }
+                    disabled={processing === selectedDelivery.deliveryId}
+                  >
+                    {processing === selectedDelivery.deliveryId
+                      ? "Confirming..."
+                      : "Confirm Pickup"}
+                  </button>
+                </>
+              )}
+
+              {selectedDelivery.status === "PICKED_UP" && (
+                <button
+                  className="modal-btn primary"
+                  onClick={() => handleCompleteDelivery(selectedDelivery)}
+                  disabled={processing === selectedDelivery.deliveryId}
+                >
+                  {processing === selectedDelivery.deliveryId
+                    ? "Completing..."
+                    : "Mark as Delivered"}
+                </button>
+              )}
+
+              {(selectedDelivery.status === "ASSIGNED" ||
+                selectedDelivery.status === "PICKED_UP") && (
+                <button
+                  className="modal-btn chat"
+                  onClick={() => {
+                    handleOpenChat(selectedDelivery);
+                    setSelectedDelivery(null);
+                  }}
+                >
+                  💬 Chat with NGO
+                </button>
+              )}
+
+              <button
+                className="modal-btn outline"
+                onClick={() => setSelectedDelivery(null)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -296,39 +705,17 @@ const MyDeliveries = ({ deliveries, onConfirmDelivery, onCancelDelivery }) => {
       <div className="stats-summary">
         <h3>Delivery Summary</h3>
         <div className="stats-grid">
-          <div className="stat-item">
-            <span className="stat-number">{deliveries.length}</span>
+          <div className="stat-card">
+            <span className="stat-number">{totalDeliveries}</span>
             <span className="stat-label">Total Deliveries</span>
           </div>
-          <div className="stat-item">
-            <span className="stat-number">
-              {deliveries.filter((d) => d.status === "delivered").length}
-            </span>
+          <div className="stat-card">
+            <span className="stat-number">{activeDeliveries}</span>
+            <span className="stat-label">Active Deliveries</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-number">{completedDeliveries}</span>
             <span className="stat-label">Completed</span>
-          </div>
-          <div className="stat-item">
-            <span className="stat-number">
-              {deliveries
-                .reduce(
-                  (total, delivery) => total + parseFloat(delivery.distance),
-                  0
-                )
-                .toFixed(1)}{" "}
-              km
-            </span>
-            <span className="stat-label">Total Distance</span>
-          </div>
-          <div className="stat-item">
-            <span className="stat-number">
-              {Math.round(
-                deliveries.reduce(
-                  (total, delivery) => total + parseFloat(delivery.distance),
-                  0
-                ) * 2
-              )}{" "}
-              min
-            </span>
-            <span className="stat-label">Total Time</span>
           </div>
         </div>
       </div>

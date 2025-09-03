@@ -5,11 +5,12 @@ import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 
 const VolunteerProfile = () => {
-  const navigate = useNavigate(); 
+  const navigate = useNavigate();
   const [volunteerData, setVolunteerData] = useState(null);
   const [formData, setFormData] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [saveStatus, setSaveStatus] = useState({ type: "", message: "" });
 
   useEffect(() => {
     const fetchVolunteer = async () => {
@@ -18,6 +19,7 @@ const VolunteerProfile = () => {
         if (!user) {
           console.error("User not logged in");
           setLoading(false);
+          navigate("/login");
           return;
         }
 
@@ -29,22 +31,53 @@ const VolunteerProfile = () => {
           if (data.role !== "volunteer") {
             console.error("This user is not registered as a volunteer.");
             setLoading(false);
+            navigate("/dashboard");
             return;
           }
-          setVolunteerData(data);
-          setFormData(data);
+
+          // Set data with proper defaults
+          const volunteerData = {
+            name: data.name || "",
+            email: data.email || user.email,
+            phone: data.phone || "",
+            vehicleType: data.vehicleType || "Car",
+            availability: data.availability || "Flexible",
+            maxDistance: data.maxDistance || "20 km",
+            address: data.address || "",
+            city: data.city || "",
+            country: data.country || "",
+            completedDeliveries: data.completedDeliveries || 0,
+            mealsDelivered: data.mealsDelivered || 0,
+            successRate: data.successRate || "0%",
+            rating: data.rating || "0.0",
+            status: data.status || "pending",
+            createdAt: data.createdAt || new Date(),
+            // Add any other fields that might be in your database
+            ...data,
+          };
+
+          setVolunteerData(volunteerData);
+          setFormData(volunteerData);
         } else {
           console.error("No volunteer profile found for this user.");
+          setSaveStatus({
+            type: "error",
+            message: "No volunteer profile found. Please contact support.",
+          });
         }
       } catch (err) {
         console.error("Error fetching volunteer profile:", err);
+        setSaveStatus({
+          type: "error",
+          message: "Failed to load profile data.",
+        });
       } finally {
         setLoading(false);
       }
     };
 
     fetchVolunteer();
-  }, []);
+  }, [navigate]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -53,51 +86,105 @@ const VolunteerProfile = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSaveStatus({ type: "", message: "" });
+
     try {
       const user = auth.currentUser;
-      if (!user) return;
+      if (!user) {
+        setSaveStatus({ type: "error", message: "User not authenticated" });
+        return;
+      }
 
       const docRef = doc(db, "users", user.email);
-      await updateDoc(docRef, formData);
 
-      setVolunteerData(formData);
+      // Prepare update data - only include fields that are allowed to be updated
+      const updateData = {
+        name: formData.name,
+        phone: formData.phone,
+        vehicleType: formData.vehicleType,
+        availability: formData.availability,
+        maxDistance: formData.maxDistance,
+        address: formData.address,
+        city: formData.city,
+        country: formData.country,
+        updatedAt: new Date(),
+      };
+
+      await updateDoc(docRef, updateData);
+
+      // Update local state with the new data
+      const updatedData = { ...volunteerData, ...updateData };
+      setVolunteerData(updatedData);
       setIsEditing(false);
+
+      setSaveStatus({
+        type: "success",
+        message: "Profile updated successfully!",
+      });
+
+      // Clear success message after 3 seconds
+      setTimeout(() => setSaveStatus({ type: "", message: "" }), 3000);
     } catch (err) {
       console.error("Error updating volunteer profile:", err);
+      setSaveStatus({
+        type: "error",
+        message: "Failed to update profile. Please try again.",
+      });
     }
   };
 
   const handleCancel = () => {
     setFormData(volunteerData);
     setIsEditing(false);
+    setSaveStatus({ type: "", message: "" });
   };
 
-  if (loading) return <p>Loading Volunteer Profile...</p>;
-  if (!volunteerData) return <p>No volunteer profile found.</p>;
+  if (loading)
+    return (
+      <div className="loading-container">
+        <p>Loading Volunteer Profile...</p>
+      </div>
+    );
 
-  const approved = volunteerData.status === "approved";
+  if (!volunteerData)
+    return (
+      <div className="error-container">
+        <p>No volunteer profile found.</p>
+        <button onClick={() => navigate("/")} className="home-btn">
+          Go to Home
+        </button>
+      </div>
+    );
+
+  const verified = volunteerData.status === "verified";
 
   return (
     <div className="volunteer-profile">
       <div className="profile-header">
-  <div className="header-left">
-    <h2>Volunteer Profile</h2>
-    <p>Manage your volunteer information and preferences</p>
-  </div>
+        <div className="header-left">
+          <h2>Volunteer Profile</h2>
+          <p>Manage your volunteer information and preferences</p>
+        </div>
 
-  <div className="header-right">
-    <button
-      className="logout-btn"
-      onClick={async () => {
-        await auth.signOut();
-        navigate("/"); 
-      }}
-    >
-      Logout
-    </button>
-  </div>
-</div>
+        <div className="header-right">
+          <button
+            className="logout-btn"
+            onClick={async () => {
+              await auth.signOut();
+              navigate("/");
+            }}
+          >
+            Logout
+          </button>
+        </div>
+      </div>
 
+      {/* Status Message */}
+      {saveStatus.message && (
+        <div className={`status-message ${saveStatus.type}`}>
+          {saveStatus.message}
+        </div>
+      )}
 
       <div className="profile-content">
         <div className="profile-card">
@@ -205,6 +292,30 @@ const VolunteerProfile = () => {
                   </select>
                 </div>
 
+                <div className="form-group">
+                  <label htmlFor="city">City *</label>
+                  <input
+                    type="text"
+                    id="city"
+                    name="city"
+                    value={formData.city || ""}
+                    onChange={handleInputChange}
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="country">Country *</label>
+                  <input
+                    type="text"
+                    id="country"
+                    name="country"
+                    value={formData.country || ""}
+                    onChange={handleInputChange}
+                    required
+                  />
+                </div>
+
                 <div className="form-group full-width">
                   <label htmlFor="address">Address *</label>
                   <textarea
@@ -251,17 +362,33 @@ const VolunteerProfile = () => {
 
                 <div className="info-item">
                   <span className="info-label">Vehicle Type:</span>
-                  <span className="info-value">{volunteerData.vehicleType}</span>
+                  <span className="info-value">
+                    {volunteerData.vehicleType}
+                  </span>
                 </div>
 
                 <div className="info-item">
                   <span className="info-label">Availability:</span>
-                  <span className="info-value">{volunteerData.availability}</span>
+                  <span className="info-value">
+                    {volunteerData.availability}
+                  </span>
                 </div>
 
                 <div className="info-item">
                   <span className="info-label">Max Distance:</span>
-                  <span className="info-value">{volunteerData.maxDistance}</span>
+                  <span className="info-value">
+                    {volunteerData.maxDistance}
+                  </span>
+                </div>
+
+                <div className="info-item">
+                  <span className="info-label">City:</span>
+                  <span className="info-value">{volunteerData.city}</span>
+                </div>
+
+                <div className="info-item">
+                  <span className="info-label">Country:</span>
+                  <span className="info-value">{volunteerData.country}</span>
                 </div>
 
                 <div className="info-item full-width">
@@ -272,14 +399,14 @@ const VolunteerProfile = () => {
 
               <div className="verification-status">
                 <div
-                  className={`status-badge ${verified ? "verified" : "pending"}`}
+                  className={`status-badge ${
+                    verified ? "verified" : "pending"
+                  }`}
                 >
-                  <span className="status-icon">
-                    {approved ? "✅" : "⌛"}
-                  </span>
-                  {approved ? "Verified Volunteer" : "Verification Pending"}
+                  <span className="status-icon">{verified ? "✅" : "⌛"}</span>
+                  {verified ? "Verified Volunteer" : "Verification Pending"}
                 </div>
-                {!approved && (
+                {!verified && (
                   <p className="status-note">
                     Your volunteer account is awaiting admin verification.
                   </p>
@@ -299,18 +426,33 @@ const VolunteerProfile = () => {
               <span className="stat-label">Completed Deliveries</span>
             </div>
             <div className="stat-item">
-              <span className="stat-number">{volunteerData.mealsDelivered || 0}</span>
+              <span className="stat-number">
+                {volunteerData.mealsDelivered || 0}
+              </span>
               <span className="stat-label">Meals Delivered</span>
             </div>
             <div className="stat-item">
-              <span className="stat-number">{volunteerData.successRate || "0%"}</span>
+              <span className="stat-number">
+                {volunteerData.successRate || "0%"}
+              </span>
               <span className="stat-label">Success Rate</span>
             </div>
             <div className="stat-item">
-              <span className="stat-number">{volunteerData.rating || "0.0"}</span>
+              <span className="stat-number">
+                {volunteerData.rating || "0.0"}
+              </span>
               <span className="stat-label">Rating</span>
             </div>
           </div>
+
+          {verified && volunteerData.completedDeliveries === 0 && (
+            <div className="welcome-message">
+              <p>
+                🎉 Welcome to Ubuntu Eats! As a verified volunteer, you'll be
+                notified when delivery opportunities become available.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
