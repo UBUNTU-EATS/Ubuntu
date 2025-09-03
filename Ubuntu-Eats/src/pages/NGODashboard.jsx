@@ -139,7 +139,7 @@ const NGODashboard = () => {
         ngoEmail: user.email,
         ngoName: ngoName,
         claimDate: serverTimestamp(),
-        status: "CLAIMED",
+        status: "PENDING",
         collectionMethod: collectionMethod || "pending", // Default to "pending" if undefined
         volunteerAssigned: null,
         createdAt: serverTimestamp(),
@@ -150,7 +150,7 @@ const NGODashboard = () => {
 
       // Update donation status
       await updateDoc(donationRef, {
-        listingStatus: "CLAIMED",
+        listingStatus: "PENDING",
         claimedBy: user.uid,
         claimedByEmail: user.email,
         claimedAt: serverTimestamp(),

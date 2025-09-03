@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import RouteMap from "./RouteMap";
 import "../styles/AvailableDeliveries.css";
 
 const AvailableDeliveries = ({ deliveries, onAccept, maxDistance }) => {
@@ -11,6 +12,27 @@ const AvailableDeliveries = ({ deliveries, onAccept, maxDistance }) => {
 
   const [selectedDelivery, setSelectedDelivery] = useState(null);
   const [processing, setProcessing] = useState(null);
+  const [userLocation, setUserLocation] = useState({
+    lat: -26.2041,
+    lng: 28.0473,
+  }); // Default to Johannesburg
+
+  // Get user's current location
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          });
+        },
+        (error) => {
+          console.log("Geolocation error:", error);
+        }
+      );
+    }
+  }, []);
 
   // Parse max distance (remove " km" and convert to number)
   const maxDistanceValue = parseInt(maxDistance);
@@ -151,37 +173,28 @@ const AvailableDeliveries = ({ deliveries, onAccept, maxDistance }) => {
     }
   };
 
+  // Function to geocode address if coordinates are not available
+  const geocodeDeliveryAddress = async (delivery) => {
+    if (delivery.coordinates) return delivery.coordinates;
+
+    try {
+      // Try to get coordinates from the address
+      const address =
+        delivery.ngoAddress || delivery.address || delivery.location;
+      if (!address) return null;
+
+      // This would typically call a geocoding service
+      console.log("Geocoding address:", address);
+      // For now, return null - in a real app, you'd use Google Maps Geocoding API or similar
+      return null;
+    } catch (error) {
+      console.warn("Failed to geocode address:", error);
+      return null;
+    }
+  };
+
   return (
     <div className="modern-available-deliveries">
-      {/* Header Section */}
-      <div className="donations-header">
-        <div className="header-main">
-          <h1>Available Deliveries</h1>
-          <p>Help deliver food to those in need within your area</p>
-        </div>
-
-        <div className="header-stats">
-          <div className="stat-item">
-            <span className="stat-number">{deliveries.length}</span>
-            <span className="stat-label">Total</span>
-          </div>
-          <div className="stat-item">
-            <span className="stat-number">
-              {
-                deliveries.filter(
-                  (d) => getUrgencyFromExpiry(d.expiryDate) === "high"
-                ).length
-              }
-            </span>
-            <span className="stat-label">Urgent</span>
-          </div>
-          <div className="stat-item">
-            <span className="stat-number">{filteredDeliveries.length}</span>
-            <span className="stat-label">Filtered</span>
-          </div>
-        </div>
-      </div>
-
       {/* Controls Section */}
       <div className="donations-controls">
         <div className="filter-section">
@@ -244,9 +257,6 @@ const AvailableDeliveries = ({ deliveries, onAccept, maxDistance }) => {
         </div>
 
         <div className="view-controls">
-          <div className="max-distance-notice">
-            Your maximum delivery distance: <strong>{maxDistance}</strong>
-          </div>
           <div className="results-count">
             {sortedDeliveries.length} delivery
             {sortedDeliveries.length !== 1 ? "s" : ""} found
@@ -370,7 +380,7 @@ const AvailableDeliveries = ({ deliveries, onAccept, maxDistance }) => {
         </div>
       )}
 
-      {/* Details Modal */}
+      {/* Details Modal with Map */}
       {selectedDelivery && (
         <div
           className="modal-backdrop"
@@ -452,6 +462,52 @@ const AvailableDeliveries = ({ deliveries, onAccept, maxDistance }) => {
                       >
                         {getUrgencyText(selectedDelivery.expiryDate)}
                       </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Map Section */}
+                <div className="detail-section">
+                  <h4>Route to Delivery Point</h4>
+                  <div className="map-section" style={{ marginTop: "15px" }}>
+                    <RouteMap
+                      origin={userLocation}
+                      destination={
+                        selectedDelivery.coordinates || {
+                          lat: -26.2041,
+                          lng: 28.0473,
+                        }
+                      }
+                      originLabel="Your Location"
+                      destinationLabel={selectedDelivery.ngoName}
+                      originIcon="👤"
+                      destinationIcon="🏠"
+                      mapContainerStyle={{ width: "100%", height: "300px" }}
+                      zoom={12}
+                      showRouteInfo={true}
+                      autoShowRoute={true}
+                      className="delivery-route-map"
+                    />
+                    <div
+                      style={{
+                        marginTop: "10px",
+                        padding: "10px",
+                        backgroundColor: "#f8f9fa",
+                        borderRadius: "6px",
+                        fontSize: "14px",
+                      }}
+                    >
+                      <p>
+                        <strong>Delivery Address:</strong>{" "}
+                        {selectedDelivery.ngoAddress || "Address not specified"}
+                      </p>
+                      <p>
+                        <strong>Food Type:</strong> {selectedDelivery.foodType}
+                      </p>
+                      <p>
+                        <strong>Urgency:</strong>{" "}
+                        {getUrgencyText(selectedDelivery.expiryDate)}
+                      </p>
                     </div>
                   </div>
                 </div>

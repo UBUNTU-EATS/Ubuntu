@@ -1,4 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { db } from "../../firebaseConfig";
+import RouteMap from "./RouteMap";
 import "../styles/MyDeliveries.css";
 
 const MyDeliveries = ({
@@ -11,6 +14,27 @@ const MyDeliveries = ({
   const [activeFilter, setActiveFilter] = useState("all");
   const [processing, setProcessing] = useState(null);
   const [selectedDelivery, setSelectedDelivery] = useState(null);
+  const [userLocation, setUserLocation] = useState({
+    lat: -26.2041,
+    lng: 28.0473,
+  }); // Default to Johannesburg
+
+  // Get user's current location
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          });
+        },
+        (error) => {
+          console.log("Geolocation error:", error);
+        }
+      );
+    }
+  }, []);
 
   const filteredDeliveries = deliveries.filter((delivery) => {
     if (activeFilter === "all") return true;
@@ -98,10 +122,33 @@ const MyDeliveries = ({
     }
   };
 
-  const handleCancelDelivery = async (deliveryId, claimId) => {
-    setProcessing(deliveryId);
+  const handleCancelDelivery = async (delivery) => {
+    setProcessing(delivery.deliveryId);
     try {
-      await onCancelDelivery(deliveryId, claimId);
+      // Update delivery assignment status to CANCELLED
+      const deliveryRef = doc(db, "deliveryAssignments", delivery.deliveryId);
+      await updateDoc(deliveryRef, {
+        status: "CANCELLED",
+        cancelledAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      // Update the claim to remove volunteer assignment
+      const claimRef = doc(db, "claims", delivery.claimId);
+      await updateDoc(claimRef, {
+        volunteerAssigned: null,
+        volunteerAssignedAt: null,
+        status: "CLAIMED", // Reset to claimed status
+        updatedAt: new Date(),
+      });
+
+      // Show success message
+      alert(
+        "Delivery cancelled successfully. It's now available for other volunteers."
+      );
+
+      // Close the details modal
+      setSelectedDelivery(null);
     } catch (error) {
       console.error("Error canceling delivery:", error);
       alert("Failed to cancel delivery. Please try again.");
@@ -110,10 +157,37 @@ const MyDeliveries = ({
     }
   };
 
-  const handleCompleteDelivery = async (deliveryId, claimId, listingId) => {
-    setProcessing(deliveryId);
+  const handleCompleteDelivery = async (delivery) => {
+    setProcessing(delivery.deliveryId);
     try {
-      await onCompleteDelivery(deliveryId, claimId, listingId);
+      // Update delivery assignment status to DELIVERED
+      const deliveryRef = doc(db, "deliveryAssignments", delivery.deliveryId);
+      await updateDoc(deliveryRef, {
+        status: "DELIVERED",
+        deliveredAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      // Update the claim status to COLLECTED
+      const claimRef = doc(db, "claims", delivery.claimId);
+      await updateDoc(claimRef, {
+        status: "COLLECTED",
+        collectedAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      // Update the food listing status to COLLECTED
+      const listingRef = doc(db, "foodListings", delivery.listingId);
+      await updateDoc(listingRef, {
+        listingStatus: "COLLECTED",
+        updatedAt: new Date(),
+      });
+
+      // Show success message
+      alert("Delivery marked as completed successfully!");
+
+      // Close the details modal
+      setSelectedDelivery(null);
     } catch (error) {
       console.error("Error completing delivery:", error);
       alert("Failed to complete delivery. Please try again.");
@@ -342,12 +416,7 @@ const MyDeliveries = ({
                     <>
                       <button
                         className="action-btn secondary"
-                        onClick={() =>
-                          handleCancelDelivery(
-                            delivery.deliveryId,
-                            delivery.claimId
-                          )
-                        }
+                        onClick={() => handleCancelDelivery(delivery)}
                         disabled={processing === delivery.deliveryId}
                       >
                         {processing === delivery.deliveryId
@@ -375,13 +444,7 @@ const MyDeliveries = ({
                   {delivery.status === "PICKED_UP" && (
                     <button
                       className="action-btn primary"
-                      onClick={() =>
-                        handleCompleteDelivery(
-                          delivery.deliveryId,
-                          delivery.claimId,
-                          delivery.listingId
-                        )
-                      }
+                      onClick={() => handleCompleteDelivery(delivery)}
                       disabled={processing === delivery.deliveryId}
                     >
                       {processing === delivery.deliveryId
@@ -407,7 +470,7 @@ const MyDeliveries = ({
         </div>
       )}
 
-      {/* Details Modal */}
+      {/* Details Modal with Map */}
       {selectedDelivery && (
         <div
           className="modal-backdrop"
@@ -485,6 +548,43 @@ const MyDeliveries = ({
                     </div>
                   </div>
                 </div>
+
+                {/* Map Section */}
+                <div className="map-section" style={{ marginTop: "15px" }}>
+                  <h4>Route to Delivery Point</h4>
+                  {selectedDelivery.coordinates && (
+                    <RouteMap
+                      origin={userLocation}
+                      destination={selectedDelivery.coordinates}
+                      originLabel="Your Location"
+                      destinationLabel={selectedDelivery.ngoName}
+                      originIcon="👤"
+                      destinationIcon="🏠"
+                      mapContainerStyle={{ width: "100%", height: "300px" }}
+                      zoom={12}
+                      showRouteInfo={true}
+                      autoShowRoute={true}
+                      className="delivery-route-map"
+                    />
+                  )}
+                  <div
+                    style={{
+                      marginTop: "10px",
+                      padding: "10px",
+                      backgroundColor: "#f8f9fa",
+                      borderRadius: "6px",
+                      fontSize: "14px",
+                    }}
+                  >
+                    <p>
+                      <strong>Delivery Address:</strong>{" "}
+                      {selectedDelivery.ngoAddress || "Address not specified"}
+                    </p>
+                    <p>
+                      <strong>Food Type:</strong> {selectedDelivery.foodType}
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <div className="modal-section">
@@ -535,6 +635,48 @@ const MyDeliveries = ({
             </div>
 
             <div className="modal-footer">
+              {/* Action buttons in modal footer */}
+              {selectedDelivery.status === "ASSIGNED" && (
+                <>
+                  <button
+                    className="modal-btn secondary"
+                    onClick={() => handleCancelDelivery(selectedDelivery)}
+                    disabled={processing === selectedDelivery.deliveryId}
+                  >
+                    {processing === selectedDelivery.deliveryId
+                      ? "Canceling..."
+                      : "Cancel Delivery"}
+                  </button>
+                  <button
+                    className="modal-btn primary"
+                    onClick={() =>
+                      handleConfirmDelivery(
+                        selectedDelivery.deliveryId,
+                        selectedDelivery.claimId,
+                        selectedDelivery.listingId
+                      )
+                    }
+                    disabled={processing === selectedDelivery.deliveryId}
+                  >
+                    {processing === selectedDelivery.deliveryId
+                      ? "Confirming..."
+                      : "Confirm Pickup"}
+                  </button>
+                </>
+              )}
+
+              {selectedDelivery.status === "PICKED_UP" && (
+                <button
+                  className="modal-btn primary"
+                  onClick={() => handleCompleteDelivery(selectedDelivery)}
+                  disabled={processing === selectedDelivery.deliveryId}
+                >
+                  {processing === selectedDelivery.deliveryId
+                    ? "Completing..."
+                    : "Mark as Delivered"}
+                </button>
+              )}
+
               {(selectedDelivery.status === "ASSIGNED" ||
                 selectedDelivery.status === "PICKED_UP") && (
                 <button
@@ -547,8 +689,9 @@ const MyDeliveries = ({
                   💬 Chat with NGO
                 </button>
               )}
+
               <button
-                className="modal-btn secondary"
+                className="modal-btn outline"
                 onClick={() => setSelectedDelivery(null)}
               >
                 Close
