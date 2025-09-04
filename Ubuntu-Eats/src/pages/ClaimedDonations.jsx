@@ -676,7 +676,7 @@ const ClaimedDonations = ({
                   <div className="content-header">
                     <div className="item-title">
                       <h3>
-                        {donation.listingCompany ||
+                        {donation.contactPerson ||
                           donation.donorName ||
                           "Unknown Donor"}
                       </h3>

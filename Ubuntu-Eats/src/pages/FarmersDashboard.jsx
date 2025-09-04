@@ -1,3 +1,4 @@
+// Updated FarmersDashboard.jsx with Donation Form Integration
 import React, { useState, useEffect } from "react";
 import {
   collection,
@@ -25,6 +26,7 @@ const FarmerDashboard = () => {
   const [farmerData, setFarmerData] = useState(null);
   const [availableDonations, setAvailableDonations] = useState([]);
   const [claimedDonations, setClaimedDonations] = useState([]);
+  const [myDonations, setMyDonations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [authLoading, setAuthLoading] = useState(true);
   const [userEmail, setUserEmail] = useState("");
@@ -45,7 +47,7 @@ const FarmerDashboard = () => {
     return () => unsubscribe(); // Cleanup listener
   }, [navigate]);
 
-  // Fetch farmer data and donations - following NGO pattern exactly
+  // Fetch farmer data and donations - enhanced with farmer's own donations
   const fetchFarmerDataAndDonations = async (user) => {
     try {
       setLoading(true);
@@ -83,7 +85,7 @@ const FarmerDashboard = () => {
         setAvailableDonations(donations);
       });
 
-      // Fetch claimed donations by this farmer - same pattern as NGO
+      // Fetch claimed donations by this farmer
       const claimedQuery = query(
         collection(db, "claims"),
         where("farmerEmail", "==", user.email)
@@ -95,7 +97,7 @@ const FarmerDashboard = () => {
           ...doc.data(),
         }));
 
-        // Get the actual donation data for each claim - same as NGO
+        // Get the actual donation data for each claim
         const claimedDonationsData = await Promise.all(
           claims.map(async (claim) => {
             try {
@@ -118,19 +120,43 @@ const FarmerDashboard = () => {
         );
 
         setClaimedDonations(claimedDonationsData);
-        setLoading(false);
       });
+
+      // NEW: Fetch farmer's own donations
+      const myDonationsQuery = query(
+        collection(db, "foodListings"),
+        where("donorEmail", "==", user.email)
+      );
+
+      const myDonationsUnsubscribe = onSnapshot(myDonationsQuery, (snapshot) => {
+        const donations = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setMyDonations(donations);
+      });
+
+      setLoading(false);
 
       // Store unsubscribe functions for cleanup
       return () => {
         availableUnsubscribe();
         claimedUnsubscribe();
+        myDonationsUnsubscribe();
       };
     } catch (error) {
       console.error("Error fetching farmer data:", error);
       navigate("/");
       setLoading(false);
     }
+  };
+
+  // Handle successful donation form submission
+  const handleDonationSubmit = async (donationData) => {
+    console.log("Farmer donation submitted:", donationData);
+    // The form handles backend submission
+    // Switch to "My Donations" tab to show the new donation
+    setActiveTab("mydonations");
   };
 
   // Claim donation - following NGO pattern exactly
@@ -161,8 +187,8 @@ const FarmerDashboard = () => {
         farmerEmail: user.email,
         farmerName: farmerName,
         claimDate: serverTimestamp(),
-        status: "PENDING", // Farmers go directly to CLAIMED
-        collectionMethod: collectionMethod || "self", // Farmers typically collect themselves
+        status: "PENDING",
+        collectionMethod: collectionMethod || "self",
         volunteerAssigned: null,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -170,7 +196,7 @@ const FarmerDashboard = () => {
 
       await addDoc(collection(db, "claims"), claimData);
 
-      // Update donation status - same as NGO
+      // Update donation status
       await updateDoc(donationRef, {
         listingStatus: "PENDING",
         claimedBy: user.uid,
@@ -184,7 +210,7 @@ const FarmerDashboard = () => {
     }
   };
 
-  // Set collection method - following NGO pattern
+  // Set collection method
   const setCollectionMethod = async (claimId, method) => {
     try {
       const claimRef = doc(db, "claims", claimId);
@@ -198,7 +224,7 @@ const FarmerDashboard = () => {
     }
   };
 
-  // Confirm collection - following NGO pattern
+  // Confirm collection
   const confirmCollection = async (claimId, listingId) => {
     try {
       const claimRef = doc(db, "claims", claimId);
@@ -220,7 +246,7 @@ const FarmerDashboard = () => {
     }
   };
 
-  // Cancel claim - following NGO pattern
+  // Cancel claim
   const cancelClaim = async (claimId, listingId) => {
     try {
       const claimRef = doc(db, "claims", claimId);
@@ -232,7 +258,7 @@ const FarmerDashboard = () => {
         updatedAt: serverTimestamp(),
       });
 
-      // Reset donation status - ensure we're using the correct field names
+      // Reset donation status
       await updateDoc(listingRef, {
         listingStatus: "UNCLAIMED",
         claimedBy: null,
@@ -280,7 +306,11 @@ const FarmerDashboard = () => {
           </div>
           <div className="stat-card">
             <span className="stat-number">{claimedDonations.length}</span>
-            <span className="stat-label">Claimed Donations</span>
+            <span className="stat-label">My Claims</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-number">{myDonations.length}</span>
+            <span className="stat-label">My Donations</span>
           </div>
           <div className="stat-card">
             <span className="stat-number">
@@ -303,13 +333,25 @@ const FarmerDashboard = () => {
           className={`nav-tab ${activeTab === "available" ? "active" : ""}`}
           onClick={() => setActiveTab("available")}
         >
-          Available Donations ({availableDonations.length})
+          Available Food ({availableDonations.length})
         </button>
         <button
           className={`nav-tab ${activeTab === "claimed" ? "active" : ""}`}
           onClick={() => setActiveTab("claimed")}
         >
           My Claims ({claimedDonations.length})
+        </button>
+        <button
+          className={`nav-tab ${activeTab === "donate" ? "active" : ""}`}
+          onClick={() => setActiveTab("donate")}
+        >
+          🌱 Donate Surplus
+        </button>
+        <button
+          className={`nav-tab ${activeTab === "mydonations" ? "active" : ""}`}
+          onClick={() => setActiveTab("mydonations")}
+        >
+          My Donations ({myDonations.length})
         </button>
       </nav>
 
@@ -319,7 +361,8 @@ const FarmerDashboard = () => {
           <FarmerProfile farmerData={farmerData} setFarmerData={setFarmerData} />
         )}
 
-        {activeTab === "available" && (
+
+         {activeTab === "available" && (
           <AvailableFoodClaims
             donations={availableDonations}
             onClaim={claimDonation}
@@ -334,7 +377,277 @@ const FarmerDashboard = () => {
             onCancelClaim={cancelClaim}
           />
         )}
+
+        {activeTab === "donate" && (
+          <FarmerDonationForm
+            onSubmit={handleDonationSubmit}
+            farmerData={farmerData}
+          />
+        )}
+
+        {activeTab === "mydonations" && (
+          <FarmerMyDonations donations={myDonations} />
+        )}
       </main>
+    </div>
+  );
+};
+
+// Component to display farmer's own donations
+const FarmerMyDonations = ({ donations }) => {
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'UNCLAIMED': return '#f59e0b';
+      case 'PENDING': return '#3b82f6';
+      case 'CLAIMED': return '#10b981';
+      case 'COLLECTED': return '#059669';
+      case 'CANCELLED': return '#ef4444';
+      default: return '#6b7280';
+    }
+  };
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'UNCLAIMED': return '🟡';
+      case 'PENDING': return '🔵';
+      case 'CLAIMED': return '✅';
+      case 'COLLECTED': return '🎉';
+      case 'CANCELLED': return '❌';
+      default: return '📦';
+    }
+  };
+
+  const formatDate = (timestamp) => {
+    if (!timestamp) return 'Not specified';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  if (donations.length === 0) {
+    return (
+      <div className="my-donations-container">
+        <div className="donations-header">
+          <h2>My Farm Donations</h2>
+          <p>Track the donations you've shared with the community</p>
+        </div>
+
+        <div className="empty-state">
+          <div className="empty-icon">🌱</div>
+          <h3>No Donations Yet</h3>
+          <p>You haven't made any donations yet.</p>
+          <p>Use the "Donate Surplus" tab to share your excess produce!</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Group donations by status
+  const groupedDonations = donations.reduce((groups, donation) => {
+    const status = donation.listingStatus || 'UNCLAIMED';
+    if (!groups[status]) {
+      groups[status] = [];
+    }
+    groups[status].push(donation);
+    return groups;
+  }, {});
+
+  const statusOrder = ['UNCLAIMED', 'PENDING', 'CLAIMED', 'COLLECTED', 'CANCELLED'];
+
+  return (
+    <div className="my-donations-container">
+      <div className="donations-header">
+        <h2>My Farm Donations</h2>
+        <p>Track the donations you've shared with the community</p>
+      </div>
+
+      <div className="donations-summary">
+        <div className="summary-card">
+          <span className="summary-number">
+            {donations.filter(d => d.listingStatus === 'UNCLAIMED').length}
+          </span>
+          <span className="summary-label">Available</span>
+        </div>
+        <div className="summary-card">
+          <span className="summary-number">
+            {donations.filter(d => ['PENDING', 'CLAIMED'].includes(d.listingStatus)).length}
+          </span>
+          <span className="summary-label">Claimed</span>
+        </div>
+        <div className="summary-card">
+          <span className="summary-number">
+            {donations.filter(d => d.listingStatus === 'COLLECTED').length}
+          </span>
+          <span className="summary-label">Successfully Collected</span>
+        </div>
+        <div className="summary-card">
+          <span className="summary-number">
+            {donations.reduce((total, d) => total + (parseInt(d.quantity) || 0), 0)}
+          </span>
+          <span className="summary-label">Total Quantity Shared</span>
+        </div>
+      </div>
+
+      <div className="donations-sections">
+        {statusOrder.map((status) => {
+          const statusDonations = groupedDonations[status];
+          if (!statusDonations || statusDonations.length === 0) return null;
+
+          const getStatusTitle = (status) => {
+            switch (status) {
+              case 'UNCLAIMED': return '🟡 Available for Claiming';
+              case 'PENDING': return '🔵 Pending Pickup';
+              case 'CLAIMED': return '✅ Claimed - Awaiting Collection';
+              case 'COLLECTED': return '🎉 Successfully Collected';
+              case 'CANCELLED': return '❌ Cancelled';
+              default: return status;
+            }
+          };
+
+          return (
+            <div key={status} className="donations-section">
+              <h3 className="section-title">
+                {getStatusTitle(status)}
+                <span className="count">{statusDonations.length}</span>
+              </h3>
+
+              <div className="donations-grid">
+                {statusDonations.map((donation) => (
+                  <div key={donation.id} className="donation-card">
+                    <div className="donation-header">
+                      <div className="donation-title">
+                        <span className="category-icon">
+                          {donation.category === 'vegetables' ? '🥕' :
+                           donation.category === 'fruits' ? '🍎' :
+                           donation.category === 'dairy' ? '🥛' :
+                           donation.category === 'grains' ? '🌾' :
+                           donation.category === 'herbs' ? '🌿' : '📦'}
+                        </span>
+                        <div>
+                          <h4>{donation.foodType || 'Farm Produce'}</h4>
+                          <p className="donation-category">{donation.category}</p>
+                        </div>
+                      </div>
+                      <div 
+                        className="donation-status"
+                        style={{ 
+                          backgroundColor: getStatusColor(donation.listingStatus),
+                          color: 'white'
+                        }}
+                      >
+                        {getStatusIcon(donation.listingStatus)} {donation.listingStatus}
+                      </div>
+                    </div>
+
+                    <div className="donation-details">
+                      <div className="detail-row">
+                        <span className="detail-label">📦 Quantity:</span>
+                        <span className="detail-value">{donation.quantity} {donation.unit}</span>
+                      </div>
+                      
+                      {donation.condition && (
+                        <div className="detail-row">
+                          <span className="detail-label">⭐ Condition:</span>
+                          <span className="detail-value">{donation.condition}</span>
+                        </div>
+                      )}
+
+                      {donation.organicCertified && (
+                        <div className="detail-row">
+                          <span className="detail-label">🌱 Organic:</span>
+                          <span className="detail-value">Yes</span>
+                        </div>
+                      )}
+
+                      <div className="detail-row">
+                        <span className="detail-label">📅 Listed:</span>
+                        <span className="detail-value">{formatDate(donation.createdAt)}</span>
+                      </div>
+
+                      {donation.claimedByEmail && (
+                        <div className="detail-row">
+                          <span className="detail-label">👤 Claimed by:</span>
+                          <span className="detail-value">{donation.claimedByEmail}</span>
+                        </div>
+                      )}
+
+                      {donation.collectBy && (
+                        <div className="detail-row">
+                          <span className="detail-label">⏰ Pickup by:</span>
+                          <span className="detail-value">{formatDate(donation.collectBy)}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {donation.listingDescription && (
+                      <div className="donation-description">
+                        <p>{donation.listingDescription}</p>
+                      </div>
+                    )}
+
+                    <div className="donation-actions">
+                      {donation.listingStatus === 'COLLECTED' && (
+                        <div className="success-message">
+                          <span>🎉 Thank you for helping reduce food waste!</span>
+                        </div>
+                      )}
+                      
+                      {donation.listingStatus === 'UNCLAIMED' && (
+                        <div className="waiting-message">
+                          <span>⏳ Waiting for someone to claim your donation</span>
+                        </div>
+                      )}
+                      
+                      {['PENDING', 'CLAIMED'].includes(donation.listingStatus) && (
+                        <div className="claimed-message">
+                          <span>✅ Someone has claimed your donation!</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Impact Summary */}
+      <div className="impact-summary">
+        <h3>🌍 Your Impact</h3>
+        <div className="impact-grid">
+          <div className="impact-card">
+            <div className="impact-number">{donations.length}</div>
+            <div className="impact-label">Donations Shared</div>
+          </div>
+          <div className="impact-card">
+            <div className="impact-number">
+              {donations.filter(d => d.listingStatus === 'COLLECTED').length}
+            </div>
+            <div className="impact-label">Successfully Collected</div>
+          </div>
+          <div className="impact-card">
+            <div className="impact-number">
+              {Math.round((donations.filter(d => d.listingStatus === 'COLLECTED').length / donations.length) * 100) || 0}%
+            </div>
+            <div className="impact-label">Success Rate</div>
+          </div>
+          <div className="impact-card">
+            <div className="impact-number">
+              {donations.reduce((total, d) => 
+                d.listingStatus === 'COLLECTED' ? total + (parseInt(d.quantity) || 0) : total, 0
+              )}
+            </div>
+            <div className="impact-label">Units Redistributed</div>
+          </div>
+        </div>
+        
+        <div className="impact-message">
+          <p>
+            🌱 <strong>Every donation matters!</strong> Your contributions help reduce food waste 
+            and provide nutritious food to communities in need. Keep up the great work!
+          </p>
+        </div>
+      </div>
     </div>
   );
 };

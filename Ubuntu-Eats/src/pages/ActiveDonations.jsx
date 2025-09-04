@@ -297,6 +297,7 @@ const fetchClaimerData = async (claimedByEmail, claimedBy) => {
 
     setNewMessage("");
     setMessages((prevMessages) => [...prevMessages, optimisticMessage]);
+    console.log(messages)
 
     // Also add to cache immediately
     addMessageToCache(chatRoomId, optimisticMessage);

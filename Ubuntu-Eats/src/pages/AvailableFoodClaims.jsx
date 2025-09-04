@@ -119,7 +119,7 @@ const AvailableFoodClaims = ({ donations, onClaim }) => {
             <div key={donation.id} className="donation-card">
               <div className="card-header">
                 <div className="donor-info">
-                  <h3>{donation.listingCompany || donation.donorName || "Unknown Donor"}</h3>
+                  <h3>{donation.contactPerson || donation.listingCompany || "Unknown Donor"}</h3>
                   <p className="distance">
                     📍 {donation.address || donation.location || "Location not specified"}
                   </p>
