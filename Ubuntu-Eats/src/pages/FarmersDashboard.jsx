@@ -161,7 +161,7 @@ const FarmerDashboard = () => {
         farmerEmail: user.email,
         farmerName: farmerName,
         claimDate: serverTimestamp(),
-        status: "CLAIMED", // Farmers go directly to CLAIMED
+        status: "PENDING", // Farmers go directly to CLAIMED
         collectionMethod: collectionMethod || "self", // Farmers typically collect themselves
         volunteerAssigned: null,
         createdAt: serverTimestamp(),
@@ -172,7 +172,7 @@ const FarmerDashboard = () => {
 
       // Update donation status - same as NGO
       await updateDoc(donationRef, {
-        listingStatus: "CLAIMED",
+        listingStatus: "PENDING",
         claimedBy: user.uid,
         claimedByEmail: user.email,
         claimedAt: serverTimestamp(),
