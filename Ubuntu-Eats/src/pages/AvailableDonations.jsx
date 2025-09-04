@@ -424,8 +424,13 @@ const AvailableDonations = ({ donations = [], onClaim }) => {
     }
   };
 
-  // 🧹 Filtering
+  // 🧹 Filtering - EXCLUDE donations where forFarmers is true
   const filteredDonations = donations.filter((donation) => {
+    // Exclude donations marked for farmers
+    if (donation.forFarmers === true) {
+      return false;
+    }
+
     if (filters.category !== "all" && donation.category !== filters.category) {
       return false;
     }
@@ -461,7 +466,7 @@ const AvailableDonations = ({ donations = [], onClaim }) => {
 
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
-    const date =  dateString.toDate ? dateString.toDate() : new Date(dateString);
+    const date = new Date(dateString);
     return date.toLocaleDateString("en-ZA", {
       day: "2-digit",
       month: "short",
@@ -640,7 +645,7 @@ const AvailableDonations = ({ donations = [], onClaim }) => {
                         {getCategoryIcon(donation.category)}
                       </span>
                       <span className="detail-text">
-                        {getCategoryLabel(donation.typeOfFood)}
+                        {getCategoryLabel(donation.category)}
                       </span>
                     </div>
 
@@ -656,14 +661,14 @@ const AvailableDonations = ({ donations = [], onClaim }) => {
                     <div className="detail-row">
                       <span className="detail-icon">📅</span>
                       <span className="detail-text">
-                        Pickup by {formatDate(donation.collectBy)}
+                        Pickup by {formatDate(donation.pickupTime)}
                       </span>
                     </div>
 
                     <div className="detail-row">
                       <span className="detail-icon">🏢</span>
                       <span className="detail-text">
-                        {donation.contactPerson ||
+                        {donation.listingCompany ||
                           donation.donorName ||
                           "Unknown Donor"}
                       </span>
@@ -690,7 +695,14 @@ const AvailableDonations = ({ donations = [], onClaim }) => {
                       Details
                     </button>
 
-                 
+                    {/* Chat Button */}
+                    <button
+                      className="action-button chat"
+                      onClick={() => openChatModal(donation)}
+                    >
+                      💬 Chat
+                    </button>
+
                     <button
                       className="action-button primary"
                       onClick={() => handleClaimClick(donation.id)}
@@ -875,7 +887,16 @@ const AvailableDonations = ({ donations = [], onClaim }) => {
             </div>
 
             <div className="modal-footer">
-             
+              {/* Chat button in modal footer */}
+              <button
+                className="modal-button chat"
+                onClick={() => {
+                  openChatModal(selectedDonation);
+                  setSelectedDonation(null);
+                }}
+              >
+                💬 Chat with Donor
+              </button>
 
               <button
                 className="modal-button secondary"
