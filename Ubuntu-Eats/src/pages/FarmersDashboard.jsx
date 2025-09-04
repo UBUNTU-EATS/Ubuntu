@@ -75,7 +75,9 @@ const FarmerDashboard = () => {
       // Fetch available donations (UNCLAIMED status) - same as NGO
       const availableQuery = query(
         collection(db, "foodListings"),
-        where("listingStatus", "==", "UNCLAIMED")
+        where("listingStatus", "==", "UNCLAIMED"),
+        where("forFarmers", "==", true)  // Only show donations for farmers
+
       );
 
       const availableUnsubscribe = onSnapshot(availableQuery, (snapshot) => {
