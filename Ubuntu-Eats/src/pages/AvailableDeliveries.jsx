@@ -34,6 +34,19 @@ const AvailableDeliveries = ({ deliveries, onAccept, maxDistance }) => {
     }
   }, []);
 
+  // Define getUrgencyFromExpiry function BEFORE it's used
+  const getUrgencyFromExpiry = (expiryDate) => {
+    if (!expiryDate) return "medium";
+    const today = new Date();
+    const expiry = new Date(expiryDate);
+    const diffTime = expiry - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays <= 1) return "high";
+    if (diffDays <= 3) return "medium";
+    return "low";
+  };
+
   // Parse max distance (remove " km" and convert to number)
   const maxDistanceValue = parseInt(maxDistance);
 
@@ -72,17 +85,7 @@ const AvailableDeliveries = ({ deliveries, onAccept, maxDistance }) => {
     return 0;
   });
 
-  const getUrgencyFromExpiry = (expiryDate) => {
-    if (!expiryDate) return "medium";
-    const today = new Date();
-    const expiry = new Date(expiryDate);
-    const diffTime = expiry - today;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays <= 1) return "high";
-    if (diffDays <= 3) return "medium";
-    return "low";
-  };
+  // Remove the duplicate getUrgencyFromExpiry function that was here
 
   const handleFilterChange = (filterType, value) => {
     setFilters((prev) => ({
@@ -161,9 +164,9 @@ const AvailableDeliveries = ({ deliveries, onAccept, maxDistance }) => {
 
       if (success) {
         setSelectedDelivery(null);
-        alert(
+        /*alert(
           "Delivery accepted successfully! It's now in your My Deliveries tab."
-        );
+        );*/
       }
     } catch (error) {
       console.error("Error accepting delivery:", error);
