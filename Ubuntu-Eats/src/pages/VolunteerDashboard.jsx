@@ -319,6 +319,7 @@ const VolunteerDashboard = () => {
             deliveries={myDeliveries}
             onConfirmDelivery={confirmDelivery}
             onCancelDelivery={cancelDelivery}
+            onCompleteDelivery={confirmDelivery}
           />
         )}
       </main>

@@ -156,7 +156,7 @@ const VolunteerProfile = () => {
       </div>
     );
 
-  const verified = volunteerData.status === "verified";
+  const verified = volunteerData.status === "approved";
 
   return (
     <div className="volunteer-profile">
@@ -400,7 +400,7 @@ const VolunteerProfile = () => {
               <div className="verification-status">
                 <div
                   className={`status-badge ${
-                    verified ? "verified" : "pending"
+                    verified ? "approved" : "pending"
                   }`}
                 >
                   <span className="status-icon">{verified ? "✅" : "⌛"}</span>
