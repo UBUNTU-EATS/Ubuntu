@@ -9,6 +9,7 @@ import {
   addDoc,
   serverTimestamp,
   getDoc,
+  getDocs,
   deleteDoc,
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
@@ -89,6 +90,10 @@ const NGODashboard = () => {
         where("ngoEmail", "==", user.email)
       );
 
+
+
+      
+
       const claimedUnsubscribe = onSnapshot(claimedQuery, async (snapshot) => {
         const claims = snapshot.docs.map((doc) => ({
           claimId: doc.id,
@@ -96,27 +101,63 @@ const NGODashboard = () => {
         }));
 
         // Get the actual donation data for each claim
-        const claimedDonationsData = await Promise.all(
-          claims.map(async (claim) => {
-            try {
-              const donationDoc = await getDoc(
-                doc(db, "foodListings", claim.listingId)
-              );
-              if (donationDoc.exists()) {
-                return {
-                  ...claim,
-                  ...donationDoc.data(),
-                  claimId: claim.claimId,
-                };
-              }
-              return claim;
-            } catch (error) {
-              console.error("Error fetching donation data:", error);
-              return claim;
-            }
-          })
-        );
+   
 
+         const claimedDonationsData = await Promise.all(
+    claims.map(async (claim) => {
+      try {
+        const donationDoc = await getDoc(
+          doc(db, "foodListings", claim.listingId)
+        );
+        
+        let claimData = {
+          ...claim,
+          claimId: claim.claimId,
+        };
+
+        if (donationDoc.exists()) {
+          claimData = {
+            ...claimData,
+            ...donationDoc.data(),
+          };
+        }
+
+        // NEW: Check if there's a volunteer assignment for this claim
+        if (claim.collectionMethod === "volunteer" && claim.volunteerAssigned) {
+          // Query deliveryAssignments to get volunteer details
+          const deliveryQuery = query(
+            collection(db, "deliveryAssignments"),
+            where("claimId", "==", claim.claimId)
+          );
+          
+          const deliverySnapshot = await getDocs(deliveryQuery);
+          
+          if (!deliverySnapshot.empty) {
+            const deliveryDoc = deliverySnapshot.docs[0];
+            const deliveryData = deliveryDoc.data();
+            
+            // Add volunteer assignment information to the claim data
+            claimData.volunteerAssignment = {
+              volunteerId: deliveryData.volunteerId,
+              volunteerEmail: deliveryData.volunteerEmail,
+              volunteerName: deliveryData.volunteerName,
+              assignedAt: deliveryData.assignedAt,
+              status: deliveryData.status, // ASSIGNED, PICKED_UP, DELIVERED
+              deliveryId: deliveryDoc.id
+            };
+          }
+        }
+
+        return claimData;
+      } catch (error) {
+        console.error("Error fetching donation data:", error);
+        return claim;
+      }
+    })
+  );
+
+
+        
         setClaimedDonations(claimedDonationsData);
         setLoading(false);
       });

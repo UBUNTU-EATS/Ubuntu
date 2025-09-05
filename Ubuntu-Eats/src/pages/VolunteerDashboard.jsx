@@ -12,9 +12,12 @@ import {
   getDocs,
 } from "firebase/firestore";
 import { db, auth } from "../../firebaseConfig";
+import { onAuthStateChanged } from "firebase/auth";
+import { useNavigate } from "react-router-dom";
 import VolunteerProfile from "./VolunteerProfile";
 import AvailableDeliveries from "./AvailableDeliveries";
 import MyDeliveries from "./MyDeliveries";
+import LoadingDots from "./loading";
 import "../styles/VolunteerDashboard.css";
 
 const VolunteerDashboard = () => {
@@ -23,30 +26,61 @@ const VolunteerDashboard = () => {
   const [availableDeliveries, setAvailableDeliveries] = useState([]);
   const [myDeliveries, setMyDeliveries] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(true);
   const [userEmail, setUserEmail] = useState("");
+  const navigate = useNavigate();
 
-  // Fetch volunteer data and deliveries
+  // Wait for Firebase Auth to initialize before fetching volunteer data
   useEffect(() => {
-    const user = auth.currentUser;
-    if (!user) return;
-
-    setUserEmail(user.email);
-
-    // Fetch volunteer profile data
-    const fetchVolunteerData = async () => {
-      try {
-        const userDocRef = doc(db, "users", user.email);
-        const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists()) {
-          setVolunteerData(userDoc.data());
-        } else {
-          console.error("Volunteer data not found for email:", user.email);
-        }
-      } catch (error) {
-        console.error("Error fetching volunteer data:", error);
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setAuthLoading(false);
+      if (user) {
+        fetchVolunteerData(user);
+      } else {
+        navigate("/"); // Redirect if not authenticated
       }
-    };
+    });
 
+    return () => unsubscribe(); // Cleanup listener
+  }, [navigate]);
+
+  // Fetch volunteer data and set up real-time listeners
+  const fetchVolunteerData = async (user) => {
+    try {
+      setLoading(true);
+      setUserEmail(user.email);
+
+      // Fetch volunteer profile data
+      const userDocRef = doc(db, "users", user.email);
+      const userDoc = await getDoc(userDocRef);
+      if (userDoc.exists()) {
+        const data = userDoc.data();
+        if (data.role === "volunteer") {
+          setVolunteerData(data);
+        } else {
+          console.warn("This user is not a volunteer.");
+          navigate("/"); // Redirect if not a volunteer
+          return;
+        }
+      } else {
+        console.error("Volunteer data not found for email:", user.email);
+        navigate("/"); // Redirect if no data
+        return;
+      }
+
+      // Set up real-time listeners for deliveries
+      setupDeliveryListeners(user.email);
+
+    } catch (error) {
+      console.error("Error fetching volunteer data:", error);
+      navigate("/"); // Redirect on error
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Set up real-time listeners for deliveries
+  const setupDeliveryListeners = (userEmail) => {
     // Fetch available deliveries (CLAIMED status with volunteer collection method)
     const availableQuery = query(
       collection(db, "claims"),
@@ -91,7 +125,7 @@ const VolunteerDashboard = () => {
     // Fetch deliveries assigned to this volunteer
     const myDeliveriesQuery = query(
       collection(db, "deliveryAssignments"),
-      where("volunteerEmail", "==", user.email)
+      where("volunteerEmail", "==", userEmail)
     );
 
     const myDeliveriesUnsubscribe = onSnapshot(
@@ -115,14 +149,35 @@ const VolunteerDashboard = () => {
                 doc(db, "foodListings", deliveryData.listingId)
               );
 
-              if (claimDoc.exists() && donationDoc.exists()) {
-                return {
-                  ...deliveryData,
-                  ...claimDoc.data(),
-                  ...donationDoc.data(),
+              let combinedData = { ...deliveryData };
+
+              if (claimDoc.exists()) {
+                const claimData = claimDoc.data();
+                // Rename conflicting fields from claims to avoid overriding delivery status
+                combinedData = {
+                  ...combinedData,
+                  claimStatus: claimData.status, // Rename claims status
+                  claimCollectionMethod: claimData.collectionMethod,
+                  claimedBy: claimData.claimedBy,
+                  claimedByEmail: claimData.claimedByEmail,
+                  claimedAt: claimData.claimedAt,
+                  // Don't spread the entire claimData to avoid status override
                 };
               }
-              return deliveryData;
+
+              if (donationDoc.exists()) {
+                const donationData = donationDoc.data();
+                // Rename conflicting fields from donations to avoid overriding delivery status
+                combinedData = {
+                  ...combinedData,
+                  listingStatus: donationData.listingStatus, // Keep this as is
+                  ...donationData,
+                  // Preserve delivery status by re-setting it after spread
+                  status: deliveryData.status, // Keep delivery status as primary
+                };
+              }
+
+              return combinedData;
             } catch (error) {
               console.error("Error fetching claim or donation data:", error);
               return deliveryData;
@@ -131,16 +186,22 @@ const VolunteerDashboard = () => {
         );
 
         setMyDeliveries(deliveries);
-        setLoading(false);
       }
     );
 
-    fetchVolunteerData();
-
-    // Cleanup subscriptions
-    return () => {
+    // Store cleanup functions
+    window.volunteerListenerCleanup = () => {
       availableUnsubscribe();
       myDeliveriesUnsubscribe();
+    };
+  };
+
+  // Cleanup listeners on component unmount
+  useEffect(() => {
+    return () => {
+      if (window.volunteerListenerCleanup) {
+        window.volunteerListenerCleanup();
+      }
     };
   }, []);
 
@@ -188,63 +249,110 @@ const VolunteerDashboard = () => {
     }
   };
 
-  const confirmDelivery = async (deliveryId, claimId, listingId) => {
+  // Separate function for confirming pickup (ASSIGNED → PICKED_UP)
+  const confirmPickup = async (deliveryId, claimId, listingId) => {
+    try {
+      const deliveryRef = doc(db, "deliveryAssignments", deliveryId);
+
+      // Update delivery status to PICKED_UP
+      await updateDoc(deliveryRef, {
+        status: "PICKED_UP",
+        pickedUpAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      console.log("Pickup confirmed successfully");
+    } catch (error) {
+      console.error("Error confirming pickup:", error);
+      throw error;
+    }
+  };
+
+  // Separate function for completing delivery (PICKED_UP → DELIVERED)
+  const completeDelivery = async (deliveryId, claimId, listingId) => {
     try {
       const deliveryRef = doc(db, "deliveryAssignments", deliveryId);
       const claimRef = doc(db, "claims", claimId);
       const listingRef = doc(db, "foodListings", listingId);
 
-      // Update delivery status
+      // Update delivery status to DELIVERED
       await updateDoc(deliveryRef, {
         status: "DELIVERED",
         deliveredAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
 
-      // Update claim status
+      // Update claim status to COLLECTED
       await updateDoc(claimRef, {
         status: "COLLECTED",
         collectedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
 
-      // Update listing status
+      // Update listing status to COLLECTED
       await updateDoc(listingRef, {
         listingStatus: "COLLECTED",
         updatedAt: serverTimestamp(),
       });
+
+      console.log("Delivery completed successfully");
     } catch (error) {
-      console.error("Error confirming delivery:", error);
+      console.error("Error completing delivery:", error);
       throw error;
     }
   };
 
+  // Improved cancel delivery function
   const cancelDelivery = async (deliveryId, claimId) => {
     try {
       const deliveryRef = doc(db, "deliveryAssignments", deliveryId);
       const claimRef = doc(db, "claims", claimId);
 
-      // Delete the delivery assignment
+      // Update delivery assignment status to CANCELLED
       await updateDoc(deliveryRef, {
         status: "CANCELLED",
         cancelledAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
 
-      // Remove volunteer assignment from claim
+      // Remove volunteer assignment from claim and reset to CLAIMED status
       await updateDoc(claimRef, {
         volunteerAssigned: null,
         volunteerAssignedAt: null,
+        status: "CLAIMED", // Reset to allow other volunteers to pick it up
         updatedAt: serverTimestamp(),
       });
+
+      console.log("Delivery cancelled successfully");
     } catch (error) {
       console.error("Error canceling delivery:", error);
       throw error;
     }
   };
 
+  // Show loading while waiting for auth state
+  if (authLoading) {
+    return (
+      <section className="loading">
+        <LoadingDots numIcons={7} radius={60} speed={0.6} size={20} />
+      </section>
+    );
+  }
+
   if (loading) {
-    return <div className="loading">Loading...</div>;
+    return (
+      <section className="loading">
+        <LoadingDots numIcons={7} radius={60} speed={0.6} size={20} />
+      </section>
+    );
+  }
+
+  if (!volunteerData) {
+    return (
+      <div className="dashboard-error">
+        Error loading dashboard data. Please try again later.
+      </div>
+    );
   }
 
   return (
@@ -256,6 +364,15 @@ const VolunteerDashboard = () => {
           <p className="welcome-text">
             Welcome, {volunteerData?.name || userEmail}!
           </p>
+          <button
+            className="logout-btn"
+            onClick={async () => {
+              await auth.signOut();
+              navigate("/");
+            }}
+          >
+            Logout
+          </button>
         </div>
         <div className="header-stats">
           <div className="stat-card">
@@ -294,6 +411,12 @@ const VolunteerDashboard = () => {
           onClick={() => setActiveTab("myDeliveries")}
         >
           My Deliveries ({myDeliveries.length})
+          {/* Add notification badge for active deliveries */}
+          {myDeliveries.filter(d => d.status === "ASSIGNED" || d.status === "PICKED_UP").length > 0 && (
+            <span className="notification-badge">
+              {myDeliveries.filter(d => d.status === "ASSIGNED" || d.status === "PICKED_UP").length}
+            </span>
+          )}
         </button>
       </nav>
 
@@ -317,9 +440,9 @@ const VolunteerDashboard = () => {
         {activeTab === "myDeliveries" && (
           <MyDeliveries
             deliveries={myDeliveries}
-            onConfirmDelivery={confirmDelivery}
+            onConfirmDelivery={confirmPickup}
             onCancelDelivery={cancelDelivery}
-            onCompleteDelivery={confirmDelivery}
+            onCompleteDelivery={completeDelivery}
           />
         )}
       </main>

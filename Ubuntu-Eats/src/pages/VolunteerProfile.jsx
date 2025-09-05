@@ -167,15 +167,7 @@ const VolunteerProfile = () => {
         </div>
 
         <div className="header-right">
-          <button
-            className="logout-btn"
-            onClick={async () => {
-              await auth.signOut();
-              navigate("/");
-            }}
-          >
-            Logout
-          </button>
+        
         </div>
       </div>
 

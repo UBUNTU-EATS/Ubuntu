@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { doc, updateDoc, deleteDoc } from "firebase/firestore";
-import { db } from "../../firebaseConfig";
+import { doc, updateDoc, deleteDoc, collection, query, orderBy, onSnapshot, addDoc, serverTimestamp } from "firebase/firestore";
+import { db, auth } from "../../firebaseConfig";
 import RouteMap from "./RouteMap";
 import "../styles/MyDeliveries.css";
 
@@ -19,7 +19,80 @@ const MyDeliveries = ({
     lng: 28.0473,
   }); // Default to Johannesburg
 
-  // Get user's current location
+  // Chat state
+  const [chatModal, setChatModal] = useState({ open: false, delivery: null });
+  const [donorData, setDonorData] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState("");
+  const [chatRoomId, setChatRoomId] = useState(null);
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [loadingDonor, setLoadingDonor] = useState(false);
+  const [userCache, setUserCache] = useState(new Map());
+  const [messageCache, setMessageCache] = useState(new Map());
+
+  // Firebase Functions base URL
+  const FUNCTIONS_BASE_URL = "https://us-central1-ubuntu-eats.cloudfunctions.net";
+
+  // Helper function to get auth token
+  const getAuthToken = async () => {
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error("User not authenticated");
+    }
+    return await user.getIdToken();
+  };
+
+  // Helper function to make authenticated HTTP requests
+  const makeAuthenticatedRequest = async (endpoint, data = null) => {
+    const token = await getAuthToken();
+
+    const response = await fetch(`${FUNCTIONS_BASE_URL}/${endpoint}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(
+        errorData.message || `HTTP error! status: ${response.status}`
+      );
+    }
+
+    return await response.json();
+  };
+
+  // Cache management functions
+  const getCachedUser = (userEmail) => {
+    return userCache.get(userEmail) || null;
+  };
+
+  const setCachedUser = (userEmail, userData) => {
+    setUserCache(prev => new Map(prev).set(userEmail, userData));
+  };
+
+  const getCachedMessages = (chatRoomId) => {
+    return messageCache.get(chatRoomId) || [];
+  };
+
+  const setCachedMessages = (chatRoomId, messages) => {
+    setMessageCache((prev) => new Map(prev).set(chatRoomId, messages));
+  };
+
+  const addMessageToCache = (chatRoomId, message) => {
+    setMessageCache((prev) => {
+      const newCache = new Map(prev);
+      const existingMessages = newCache.get(chatRoomId) || [];
+      const updatedMessages = [...existingMessages, message];
+      newCache.set(chatRoomId, updatedMessages);
+      return newCache;
+    });
+  };
+
+  // Get user's current location (optional)
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -28,11 +101,34 @@ const MyDeliveries = ({
             lat: position.coords.latitude,
             lng: position.coords.longitude,
           });
+          console.log("Location access granted - maps will show your current location");
         },
         (error) => {
-          console.log("Geolocation error:", error);
+          // Handle different geolocation errors gracefully
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              console.log("Location access denied by user - using default location (Johannesburg)");
+              break;
+            case error.POSITION_UNAVAILABLE:
+              console.log("Location information unavailable - using default location");
+              break;
+            case error.TIMEOUT:
+              console.log("Location request timed out - using default location");
+              break;
+            default:
+              console.log("Unknown location error - using default location");
+              break;
+          }
+          // Keep the default Johannesburg location - no need to show error to user
+        },
+        {
+          timeout: 10000, // 10 second timeout
+          enableHighAccuracy: false, // Don't require GPS for faster response
+          maximumAge: 300000 // Accept cached position up to 5 minutes old
         }
       );
+    } else {
+      console.log("Geolocation not supported by this browser - using default location");
     }
   }, []);
 
@@ -110,10 +206,14 @@ const MyDeliveries = ({
     return category.replace(/-/g, " ");
   };
 
+  // FIX: Use the callback prop instead of doing Firebase operations directly
   const handleConfirmDelivery = async (deliveryId, claimId, listingId) => {
     setProcessing(deliveryId);
     try {
+      // Use the callback prop to let parent handle the operation
       await onConfirmDelivery(deliveryId, claimId, listingId);
+      // Close modal on success
+      setSelectedDelivery(null);
     } catch (error) {
       console.error("Error confirming delivery:", error);
       alert("Failed to confirm delivery. Please try again.");
@@ -122,26 +222,18 @@ const MyDeliveries = ({
     }
   };
 
+  // FIX: Use the callback prop instead of doing Firebase operations directly
   const handleCancelDelivery = async (delivery) => {
     setProcessing(delivery.deliveryId);
     try {
-      // Update delivery assignment status to CANCELLED
-      const deliveryRef = doc(db, "deliveryAssignments", delivery.deliveryId);
-      await updateDoc(deliveryRef, {
-        status: "CANCELLED",
-        cancelledAt: new Date(),
-        updatedAt: new Date(),
-      });
-
-      // Update the claim to remove volunteer assignment
-      const claimRef = doc(db, "claims", delivery.claimId);
-      await updateDoc(claimRef, {
-        volunteerAssigned: null,
-        volunteerAssignedAt: null,
-        status: "CLAIMED", // Reset to claimed status
-        updatedAt: new Date(),
-      });
-
+      // Use the callback prop to let parent handle the operation
+      if (onCancelDelivery) {
+        await onCancelDelivery(delivery.deliveryId, delivery.claimId);
+      } else {
+        // Fallback to direct Firebase operations if callback not provided
+        await directCancelDelivery(delivery);
+      }
+      
       // Show success message
       alert(
         "Delivery cancelled successfully. It's now available for other volunteers."
@@ -157,31 +249,17 @@ const MyDeliveries = ({
     }
   };
 
+  // FIX: Use the callback prop instead of doing Firebase operations directly
   const handleCompleteDelivery = async (delivery) => {
     setProcessing(delivery.deliveryId);
     try {
-      // Update delivery assignment status to DELIVERED
-      const deliveryRef = doc(db, "deliveryAssignments", delivery.deliveryId);
-      await updateDoc(deliveryRef, {
-        status: "DELIVERED",
-        deliveredAt: new Date(),
-        updatedAt: new Date(),
-      });
-
-      // Update the claim status to COLLECTED
-      const claimRef = doc(db, "claims", delivery.claimId);
-      await updateDoc(claimRef, {
-        status: "COLLECTED",
-        collectedAt: new Date(),
-        updatedAt: new Date(),
-      });
-
-      // Update the food listing status to COLLECTED
-      const listingRef = doc(db, "foodListings", delivery.listingId);
-      await updateDoc(listingRef, {
-        listingStatus: "COLLECTED",
-        updatedAt: new Date(),
-      });
+      // Use the callback prop to let parent handle the operation
+      if (onCompleteDelivery) {
+        await onCompleteDelivery(delivery.deliveryId, delivery.claimId, delivery.listingId);
+      } else {
+        // Fallback to direct Firebase operations if callback not provided
+        await directCompleteDelivery(delivery);
+      }
 
       // Show success message
       alert("Delivery marked as completed successfully!");
@@ -196,10 +274,298 @@ const MyDeliveries = ({
     }
   };
 
+  // Fallback direct Firebase operations (keep as backup)
+  const directCancelDelivery = async (delivery) => {
+    const deliveryRef = doc(db, "deliveryAssignments", delivery.deliveryId);
+    await updateDoc(deliveryRef, {
+      status: "CANCELLED",
+      cancelledAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const claimRef = doc(db, "claims", delivery.claimId);
+    await updateDoc(claimRef, {
+      volunteerAssigned: null,
+      volunteerAssignedAt: null,
+      status: "CLAIMED",
+      updatedAt: new Date(),
+    });
+  };
+
+  const directCompleteDelivery = async (delivery) => {
+    const deliveryRef = doc(db, "deliveryAssignments", delivery.deliveryId);
+    await updateDoc(deliveryRef, {
+      status: "DELIVERED",
+      deliveredAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const claimRef = doc(db, "claims", delivery.claimId);
+    await updateDoc(claimRef, {
+      status: "COLLECTED",
+      collectedAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const listingRef = doc(db, "foodListings", delivery.listingId);
+    await updateDoc(listingRef, {
+      listingStatus: "COLLECTED",
+      updatedAt: new Date(),
+    });
+  };
+
+  // Fetch donor data
+  const fetchDonorData = async (donorEmail) => {
+    if (!donorEmail) return;
+    
+    // Check cache first
+    const cachedUser = getCachedUser(donorEmail);
+    if (cachedUser) {
+      setDonorData(cachedUser);
+      setLoadingDonor(false);
+      console.log('Loaded donor data from cache:', cachedUser.name);
+    } else {
+      setLoadingDonor(true);
+    }
+
+    try {
+      // Always fetch fresh data in background to keep cache updated
+      const result = await makeAuthenticatedRequest("getUserData", {
+        userEmail: donorEmail,
+      });
+
+      if (result.success) {
+        // Update cache with fresh data
+        setCachedUser(donorEmail, result.user);
+        setDonorData(result.user);
+        
+        if (!cachedUser) {
+          console.log('Loaded fresh donor data:', result.user.name);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching donor data:", error);
+      // If we have cached data and fresh fetch fails, keep using cached data
+      if (!cachedUser) {
+        setDonorData(null);
+      }
+    } finally {
+      setLoadingDonor(false);
+    }
+  };
+
   const handleOpenChat = (delivery) => {
     if (onOpenChat) {
       onOpenChat(delivery);
+    } else {
+      // Fallback: Open chat modal directly
+      openChatModal(delivery);
     }
+  };
+
+  // Chat functionality - Open chat modal
+  const openChatModal = async (delivery) => {
+    setChatModal({ open: true, delivery });
+
+    // Get donor email from the delivery data
+    const donorEmail = delivery.donorEmail || delivery.listingCompany;
+    const volunteerEmail = auth.currentUser.email;
+    const donationId = delivery.listingId;
+
+    // Calculate chat room ID immediately
+    const calculatedChatRoomId = `${donorEmail.replace("@", "_")}_${volunteerEmail.replace("@", "_")}_${donationId}`;
+
+    // Load cached messages immediately for instant display
+    const cachedMessages = getCachedMessages(calculatedChatRoomId);
+    setMessages(cachedMessages);
+    setChatRoomId(calculatedChatRoomId);
+
+    // Load cached user data immediately if available
+    const cachedUser = getCachedUser(donorEmail);
+    if (cachedUser) {
+      setDonorData(cachedUser);
+      setLoadingDonor(false);
+    } else {
+      setLoadingDonor(true);
+    }
+
+    if (donorEmail) {
+      // Start fetching user data (will use cache if available)
+      fetchDonorData(donorEmail);
+
+      // Set up real-time listener immediately
+      setupMessageListener(calculatedChatRoomId);
+
+      // Create/get chat room in background
+      try {
+        const result = await makeAuthenticatedRequest("createChatRoom", {
+          donorEmail: donorEmail,
+          ngoEmail: volunteerEmail, // Backend expects 'ngoEmail' but we're using it for volunteer
+          donationId: donationId,
+        });
+
+        if (result.success && result.chatRoomId !== calculatedChatRoomId) {
+          // If server returns different chatRoomId, update accordingly
+          setChatRoomId(result.chatRoomId);
+          setupMessageListener(result.chatRoomId);
+        }
+      } catch (error) {
+        console.error("Error creating/getting chat room:", error);
+        // Continue with calculated chat room ID even if API call fails
+      }
+    }
+  };
+
+  const closeChatModal = () => {
+    if (chatModal.unsubscribe) {
+      chatModal.unsubscribe();
+    }
+    setChatModal({ open: false, delivery: null });
+    setDonorData(null);
+    setMessages([]);
+    setChatRoomId(null);
+    setNewMessage("");
+  };
+
+  const setupMessageListener = (roomId) => {
+    const messagesRef = collection(db, "chatRooms", roomId, "messages");
+    const q = query(messagesRef, orderBy("timestamp", "asc"));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const firebaseMessages = [];
+      snapshot.forEach((doc) => {
+        firebaseMessages.push({
+          id: doc.id,
+          ...doc.data(),
+          isOptimistic: false,
+        });
+      });
+
+      // Update cache with latest messages
+      setCachedMessages(roomId, firebaseMessages);
+
+      // Merge with optimistic messages and remove duplicates
+      setMessages((prevMessages) => {
+        const optimisticMessages = prevMessages.filter(
+          (msg) =>
+            msg.isOptimistic &&
+            !firebaseMessages.some((fbMsg) => {
+              const isSameMessage =
+                fbMsg.text === msg.text &&
+                fbMsg.senderEmail === msg.senderEmail;
+
+              if (!isSameMessage) return false;
+
+              const fbTime = fbMsg.timestamp?.toDate
+                ? fbMsg.timestamp.toDate().getTime()
+                : fbMsg.timestamp?.seconds
+                ? fbMsg.timestamp.seconds * 1000
+                : 0;
+              const optTime =
+                typeof msg.timestamp === "number"
+                  ? msg.timestamp
+                  : msg.timestamp?.seconds
+                  ? msg.timestamp.seconds * 1000
+                  : 0;
+
+              return Math.abs(fbTime - optTime) < 5000;
+            })
+        );
+
+        const allMessages = [...firebaseMessages, ...optimisticMessages];
+        return allMessages.sort((a, b) => {
+          const getTimestampValue = (ts) => {
+            if (!ts) return 0;
+            if (ts?.toDate && typeof ts.toDate === "function") {
+              return ts.toDate().getTime();
+            }
+            if (ts?.seconds) {
+              return ts.seconds * 1000;
+            }
+            if (typeof ts === "number") {
+              return ts;
+            }
+            return 0;
+          };
+
+          const aTime = getTimestampValue(a.timestamp);
+          const bTime = getTimestampValue(b.timestamp);
+          return aTime - bTime;
+        });
+      });
+    });
+
+    setChatModal((prev) => ({ ...prev, unsubscribe }));
+  };
+
+  // Send message with optimistic updates
+  const sendMessage = async () => {
+    if (!newMessage.trim() || sendingMessage || !chatRoomId) return;
+
+    const messageText = newMessage.trim();
+    const user = auth.currentUser;
+    const userData = JSON.parse(localStorage.getItem("userData") || "{}");
+
+    const tempId = `temp_${Date.now()}_${Math.random()
+      .toString(36)
+      .substr(2, 9)}`;
+
+    const optimisticMessage = {
+      id: tempId,
+      text: messageText,
+      senderEmail: user.email,
+      senderName: userData.name || user.displayName || "Volunteer",
+      senderRole: userData.role || "volunteer",
+      timestamp: Date.now(),
+      read: false,
+      isOptimistic: true,
+      status: "sending",
+    };
+
+    setNewMessage("");
+    setMessages((prevMessages) => [...prevMessages, optimisticMessage]);
+    addMessageToCache(chatRoomId, optimisticMessage);
+    setSendingMessage(true);
+
+    try {
+      await makeAuthenticatedRequest("sendMessage", {
+        chatRoomId,
+        message: messageText,
+        senderName: userData.name || user.displayName || "Volunteer",
+        senderRole: userData.role || "volunteer",
+      });
+
+      setMessages((prevMessages) =>
+        prevMessages.map((msg) =>
+          msg.id === tempId
+            ? { ...msg, status: "sent", isOptimistic: true }
+            : msg
+        )
+      );
+    } catch (error) {
+      console.error("Error sending message:", error);
+
+      setMessages((prevMessages) =>
+        prevMessages.map((msg) =>
+          msg.id === tempId
+            ? { ...msg, status: "failed", isOptimistic: true }
+            : msg
+        )
+      );
+      
+      setNewMessage(messageText); // Restore message on error
+    } finally {
+      setSendingMessage(false);
+    }
+  };
+
+  const formatMessageTime = (timestamp) => {
+    if (!timestamp) return "";
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleTimeString("en-ZA", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   // Calculate statistics for header
@@ -259,6 +625,9 @@ const MyDeliveries = ({
           {filteredDeliveries.map((delivery) => {
             const statusConfig = getStatusConfig(delivery.status);
 
+            // DEBUG: Log delivery status to console
+            console.log("Delivery status:", delivery.status, "for delivery:", delivery.deliveryId);
+
             return (
               <div key={delivery.deliveryId} className="delivery-card">
                 {/* Header Section */}
@@ -281,6 +650,7 @@ const MyDeliveries = ({
                     >
                       {statusConfig.label}
                     </span>
+                   
                   </div>
                 </div>
 
@@ -411,6 +781,7 @@ const MyDeliveries = ({
                     </button>
                   )}
 
+
                   {/* Action Buttons based on status */}
                   {delivery.status === "ASSIGNED" && (
                     <>
@@ -441,6 +812,7 @@ const MyDeliveries = ({
                     </>
                   )}
 
+           
                   {delivery.status === "PICKED_UP" && (
                     <button
                       className="action-btn primary"
@@ -583,6 +955,11 @@ const MyDeliveries = ({
                     <p>
                       <strong>Food Type:</strong> {selectedDelivery.foodType}
                     </p>
+                    {userLocation.lat === -26.2041 && userLocation.lng === 28.0473 && (
+                      <p style={{ color: "#666", fontSize: "12px", fontStyle: "italic" }}>
+                        💡 Tip: Allow location access for personalized route directions from your current location
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -686,7 +1063,7 @@ const MyDeliveries = ({
                     setSelectedDelivery(null);
                   }}
                 >
-                  💬 Chat with NGO
+                  💬 Chat with Donor
                 </button>
               )}
 
@@ -701,6 +1078,109 @@ const MyDeliveries = ({
         </div>
       )}
 
+      {/* Chat Modal */}
+ {chatModal.open && (
+        <div className="modal-backdrop" onClick={closeChatModal}>
+          <div className="chat-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="chat-header">
+              <div className="chat-title">
+                <h3>💬 Chat with Donor</h3>
+                <p>
+                  {loadingDonor
+                    ? "Loading..."
+                    : donorData
+                    ? `${donorData.name || donorData.companyName}`
+                    : "Donor"}
+                </p>
+              </div>
+              <button className="close-button" onClick={closeChatModal}>
+                ✕
+              </button>
+            </div>
+
+            <div className="chat-body">
+              {donorData && (
+                <div className="donor-info">
+                  <div className="donor-avatar">🏪</div>
+                  <div className="donor-details">
+                    <h4>{donorData.name || donorData.companyName}</h4>
+                    <p>DONOR</p>
+                    <p>📧 {donorData.email}</p>
+                    <p>📞 {donorData.phone}</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="chat-messages-container">
+                <div className="messages-list">
+                  {messages.length === 0 ? (
+                    <div className="no-messages">
+                      <div className="chat-placeholder-icon">💬</div>
+                      <p>No messages yet. Start the conversation!</p>
+                    </div>
+                  ) : (
+                    messages.map((message) => {
+                      const user = auth.currentUser;
+                      const isMyMessage = message.senderEmail === user?.email;
+                      
+                      return (
+                        <div
+                          key={message.id}
+                          className={`message ${isMyMessage ? "sent own-message" : "received other-message"}`}
+                        >
+                          <div className="message-content">
+                            <div className="message-header">
+                              <span className="sender-name">
+                                {isMyMessage ? "You" : message.senderName}
+                              </span>
+                              <span className="message-time">
+                                {formatMessageTime(message.timestamp)}
+                              </span>
+                            </div>
+                            <div className="message-text">{message.text}</div>
+                            {message.status && message.isOptimistic && (
+                              <div className="message-status">
+                                {message.status === "sending" && "Sending..."}
+                                {message.status === "failed" && "Failed to send"}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              <div className="message-input-container">
+                <div className="message-input-group">
+                  <input
+                    type="text"
+                    className="chat-input"
+                    placeholder="Type your message..."
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        sendMessage();
+                      }
+                    }}
+                    disabled={sendingMessage}
+                  />
+                  <button
+                    className="send-button"
+                    onClick={sendMessage}
+                    disabled={!newMessage.trim() || sendingMessage}
+                  >
+                    {sendingMessage ? "..." : "📤"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Stats Summary */}
       <div className="stats-summary">
         <h3>Delivery Summary</h3>

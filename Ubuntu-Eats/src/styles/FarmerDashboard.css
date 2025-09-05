@@ -1557,16 +1557,7 @@
   background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
 }
 
-/* Loading States */
-.loading {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 400px;
-  background: white;
-  border-radius: 20px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
-}
+
 
 /* Responsive Design Enhancements */
 @media (max-width: 992px) {
@@ -1931,9 +1922,10 @@ textarea:focus-visible {
   justify-content: center;
   align-items: center;
   min-height: 400px;
-  background: white;
-  border-radius: 20px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+    background-color: #f9f9f9; /* Match your app background */
+
+  /* border-radius: 20px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05); */
 }
 
 /* Responsive Design */

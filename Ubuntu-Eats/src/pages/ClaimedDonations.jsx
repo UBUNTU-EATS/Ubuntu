@@ -464,6 +464,39 @@ const ClaimedDonations = ({
     setNewMessage("");
   };
 
+
+
+
+  
+
+const getDeliveryStatusClass = (status) => {
+  switch (status) {
+    case "ASSIGNED": return "assigned";
+    case "PICKED_UP": return "picked-up";
+    case "DELIVERED": return "delivered";
+    default: return "unknown";
+  }
+};
+
+const getDeliveryStatusIcon = (status) => {
+  switch (status) {
+    case "ASSIGNED": return "🔄";
+    case "PICKED_UP": return "📦";
+    case "DELIVERED": return "✅";
+    default: return "❓";
+  }
+};
+
+const getDeliveryStatusText = (status) => {
+  switch (status) {
+    case "ASSIGNED": return "Volunteer Assigned";
+    case "PICKED_UP": return "Food Picked Up";
+    case "DELIVERED": return "Delivered Successfully";
+    default: return "Unknown Status";
+  }
+};
+
+
   // Setup message listener
   const setupMessageListener = (roomId) => {
     const messagesRef = collection(db, "chatRooms", roomId, "messages");
@@ -795,58 +828,103 @@ const ClaimedDonations = ({
                     </div>
                   )}
 
-                  {donation.status === "CLAIMED" && (
-                    <div className="collection-method">
-                      <h4>Collection Method</h4>
-                      <div className="method-options">
-                        <button
-                          className={`action-button ${
-                            donation.collectionMethod === "self"
-                              ? "primary"
-                              : "outline"
-                          }`}
-                          onClick={() =>
-                            handleSetCollectionMethod(donation.claimId, "self")
-                          }
-                          disabled={processing === donation.claimId}
-                        >
-                          {processing === donation.claimId
-                            ? "Processing..."
-                            : "🚗 Self Collection"}
-                        </button>
-                        <button
-                          className={`action-button ${
-                            donation.collectionMethod === "volunteer"
-                              ? "primary"
-                              : "outline"
-                          }`}
-                          onClick={() =>
-                            handleSetCollectionMethod(
-                              donation.claimId,
-                              "volunteer"
-                            )
-                          }
-                          disabled={processing === donation.claimId}
-                        >
-                          {processing === donation.claimId
-                            ? "Processing..."
-                            : "🤝 Volunteer Assistance"}
-                        </button>
-                      </div>
-                    </div>
-                  )}
+               {donation.status === "CLAIMED" && !donation.volunteerAssignment && (
+  <div className="collection-method">
+    <h4>Collection Method</h4>
+    <div className="method-options">
+      <button
+        className={`action-button ${
+          donation.collectionMethod === "self"
+            ? "primary"
+            : "outline"
+        }`}
+        onClick={() =>
+          handleSetCollectionMethod(donation.claimId, "self")
+        }
+        disabled={processing === donation.claimId}
+      >
+        {processing === donation.claimId
+          ? "Processing..."
+          : "🚗 Self Collection"}
+      </button>
+      <button
+        className={`action-button ${
+          donation.collectionMethod === "volunteer"
+            ? "primary"
+            : "outline"
+        }`}
+        onClick={() =>
+          handleSetCollectionMethod(
+            donation.claimId,
+            "volunteer"
+          )
+        }
+        disabled={processing === donation.claimId}
+      >
+        {processing === donation.claimId
+          ? "Processing..."
+          : "🤝 Volunteer Assistance"}
+      </button>
+    </div>
+  </div>
+)}
 
-                  {donation.collectionMethod === "volunteer" &&
-                    donation.status === "CLAIMED" && (
-                      <div className="volunteer-info">
-                        <div className="volunteer-assigned">
-                          <span className="waiting-text">
-                            ⏳ Waiting for volunteer assignment...
-                          </span>
-                        </div>
-                      </div>
-                    )}
 
+{/* Show volunteer assignment info if it exists */}
+{donation.volunteerAssignment && (
+  <div className="volunteer-info">
+    <div className="volunteer-assigned">
+      <div className="assignment-header">
+        <span className="assigned-icon">🤝</span>
+        <span className="assigned-text">Volunteer Assigned!</span>
+      </div>
+      
+      <div className="volunteer-details">
+        <div className="volunteer-card">
+          <div className="volunteer-avatar">👤</div>
+          <div className="volunteer-info-details">
+            <h4 className="volunteer-name">{donation.volunteerAssignment.volunteerName}</h4>
+            <p className="volunteer-email">📧 {donation.volunteerAssignment.volunteerEmail}</p>
+            <p className="assignment-time">
+              🕐 Assigned {formatDate(donation.volunteerAssignment.assignedAt)}
+            </p>
+          </div>
+        </div>
+        
+        <div className="delivery-status-info">
+         
+          
+         
+          
+          
+          {donation.volunteerAssignment.status === "PICKED_UP" && (
+            <p className="status-description">
+              The volunteer has picked up the food and is on the way to deliver it.
+            </p>
+          )}
+          
+          {donation.volunteerAssignment.status === "DELIVERED" && (
+            <p className="status-description">
+              The food has been successfully delivered! 🎉
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+
+{/* Show waiting message only if no volunteer assignment exists */}
+{!donation.volunteerAssignment && donation.status === "CLAIMED" && (
+  <div className="volunteer-info">
+    <div className="volunteer-assigned">
+      <span className="waiting-text">
+        ⏳ Waiting for volunteer assignment...
+      </span>
+    </div>
+  </div>
+)}
+                  
                   {donation.collectionMethod === "self" &&
                     donation.status === "CLAIMED" && (
                       <div className="collection-instructions">
