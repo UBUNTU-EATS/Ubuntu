@@ -1356,3 +1356,116 @@
     padding: 0 1rem 1rem 1rem;
   }
 }
+
+/* Card Actions - FIXED SECTION */
+.card-actions {
+  display: flex;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid #f1f5f9;
+  flex-wrap: wrap;
+}
+
+.action-btn {
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  border: none;
+  text-align: center;
+  min-width: 120px;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.action-btn.outline {
+  background: transparent;
+  color: #475569;
+  border: 2px solid #e2e8f0;
+}
+
+.action-btn.outline:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  transform: translateY(-1px);
+}
+
+.action-btn.primary {
+  background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%);
+  color: white;
+}
+
+.action-btn.primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+}
+
+.action-btn.secondary {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: white;
+}
+
+.action-btn.secondary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.action-btn.chat {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  color: white;
+}
+
+.action-btn.chat:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}
+
+.action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.completed-actions {
+  display: flex;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.completed-actions .action-btn {
+  flex: 1;
+  min-width: auto;
+}
+
+/* Responsive adjustments for buttons */
+@media (max-width: 768px) {
+  .card-actions {
+    flex-direction: column;
+  }
+
+  .action-btn {
+    width: 100%;
+    min-width: auto;
+  }
+
+  .completed-actions {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 480px) {
+  .card-actions {
+    padding: 0.75rem 1rem;
+  }
+
+  .action-btn {
+    padding: 0.625rem 0.875rem;
+    font-size: 0.85rem;
+  }
+}

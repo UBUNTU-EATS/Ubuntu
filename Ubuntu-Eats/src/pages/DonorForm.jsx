@@ -21,17 +21,18 @@ const DonationForm = ({ onSubmit, donorData }) => {
 
   const [images, setImages] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitStatus, setSubmitStatus] = useState({ type: '', message: '' });
+  const [submitStatus, setSubmitStatus] = useState({ type: "", message: "" });
   const [dragActive, setDragActive] = useState(false);
 
   // Your Firebase Functions base URL - update this with your project ID
-  const FUNCTIONS_BASE_URL = "https://us-central1-ubuntu-eats.cloudfunctions.net";
+  const FUNCTIONS_BASE_URL =
+    "https://us-central1-ubuntu-eats.cloudfunctions.net";
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: type === "checkbox" ? checked : value,
     }));
   };
 
@@ -39,7 +40,7 @@ const DonationForm = ({ onSubmit, donorData }) => {
   const getAuthToken = async () => {
     const user = auth.currentUser;
     if (!user) {
-      throw new Error('User not authenticated');
+      throw new Error("User not authenticated");
     }
     return await user.getIdToken();
   };
@@ -47,19 +48,21 @@ const DonationForm = ({ onSubmit, donorData }) => {
   // Helper function to make authenticated HTTP requests
   const makeAuthenticatedRequest = async (endpoint, data) => {
     const token = await getAuthToken();
-    
+
     const response = await fetch(`${FUNCTIONS_BASE_URL}/${endpoint}`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify(data)
+      body: JSON.stringify(data),
     });
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      throw new Error(
+        errorData.message || `HTTP error! status: ${response.status}`
+      );
     }
 
     return await response.json();
@@ -67,21 +70,21 @@ const DonationForm = ({ onSubmit, donorData }) => {
 
   const processFiles = (files) => {
     const maxSize = 5 * 1024 * 1024; // 5MB per file
-    const validTypes = ['image/jpeg', 'image/png', 'image/jpg'];
-    
+    const validTypes = ["image/jpeg", "image/png", "image/jpg"];
+
     files.forEach((file) => {
       if (!validTypes.includes(file.type)) {
         setSubmitStatus({
-          type: 'error',
-          message: `${file.name} is not a valid image format. Please use JPG or PNG.`
+          type: "error",
+          message: `${file.name} is not a valid image format. Please use JPG or PNG.`,
         });
         return;
       }
-      
+
       if (file.size > maxSize) {
         setSubmitStatus({
-          type: 'error',
-          message: `${file.name} is too large. Maximum size is 5MB.`
+          type: "error",
+          message: `${file.name} is too large. Maximum size is 5MB.`,
         });
         return;
       }
@@ -94,7 +97,7 @@ const DonationForm = ({ onSubmit, donorData }) => {
             id: Date.now() + Math.random(),
             url: e.target.result,
             name: file.name,
-            file: file // Store the actual file for upload
+            file: file, // Store the actual file for upload
           },
         ]);
       };
@@ -135,37 +138,43 @@ const DonationForm = ({ onSubmit, donorData }) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result.split(',')[1]); // Remove data:image/jpeg;base64, prefix
-      reader.onerror = error => reject(error);
+      reader.onload = () => resolve(reader.result.split(",")[1]); // Remove data:image/jpeg;base64, prefix
+      reader.onerror = (error) => reject(error);
     });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-    setSubmitStatus({ type: '', message: '' });
+    setSubmitStatus({ type: "", message: "" });
 
     try {
       // Get coordinates for the address (optional)
       let coordinates = null;
       try {
-        const geoResult = await makeAuthenticatedRequest('geocodeAddress', { 
-          address: formData.pickupAddress 
+        const geoResult = await makeAuthenticatedRequest("geocodeAddress", {
+          address: formData.pickupAddress,
         });
         coordinates = geoResult.coordinates;
       } catch (geoError) {
-        console.warn("Could not geocode address, proceeding without coordinates:", geoError.message);
+        console.warn(
+          "Could not geocode address, proceeding without coordinates:",
+          geoError.message
+        );
       }
 
       // Create the donation listing
-      const listingResult = await makeAuthenticatedRequest('createDonationListing', {
-        ...formData,
-        donorData,
-        coordinates
-      });
+      const listingResult = await makeAuthenticatedRequest(
+        "createDonationListing",
+        {
+          ...formData,
+          donorData,
+          coordinates,
+        }
+      );
 
       if (!listingResult.success) {
-        throw new Error(listingResult.message || 'Failed to create listing');
+        throw new Error(listingResult.message || "Failed to create listing");
       }
 
       const listingID = listingResult.listingID;
@@ -176,11 +185,11 @@ const DonationForm = ({ onSubmit, donorData }) => {
           const image = images[i];
           try {
             const base64Data = await convertToBase64(image.file);
-            await makeAuthenticatedRequest('uploadDonationImage', {
+            await makeAuthenticatedRequest("uploadDonationImage", {
               listingID,
               imageData: base64Data,
               fileName: `image_${i + 1}_${image.name}`,
-              contentType: image.file.type
+              contentType: image.file.type,
             });
           } catch (uploadError) {
             console.error(`Error uploading ${image.name}:`, uploadError);
@@ -198,8 +207,9 @@ const DonationForm = ({ onSubmit, donorData }) => {
 
       // Show success message
       setSubmitStatus({
-        type: 'success',
-        message: 'Donation submitted successfully! It will appear in available listings shortly.'
+        type: "success",
+        message:
+          "Donation submitted successfully! It will appear in available listings shortly.",
       });
 
       // Reset form
@@ -219,12 +229,12 @@ const DonationForm = ({ onSubmit, donorData }) => {
         forFarmers: false,
       });
       setImages([]);
-
     } catch (error) {
       console.error("Error submitting donation:", error);
       setSubmitStatus({
-        type: 'error',
-        message: error.message || 'Failed to submit donation. Please try again.'
+        type: "error",
+        message:
+          error.message || "Failed to submit donation. Please try again.",
       });
     } finally {
       setIsSubmitting(false);
@@ -243,14 +253,20 @@ const DonationForm = ({ onSubmit, donorData }) => {
 
       {/* Status Messages */}
       {submitStatus.message && (
-        <div className={`status-message ${submitStatus.type}`} style={{
-          padding: '1rem',
-          marginBottom: '1rem',
-          borderRadius: '8px',
-          backgroundColor: submitStatus.type === 'success' ? '#d4edda' : '#f8d7da',
-          color: submitStatus.type === 'success' ? '#155724' : '#721c24',
-          border: `1px solid ${submitStatus.type === 'success' ? '#c3e6cb' : '#f5c6cb'}`
-        }}>
+        <div
+          className={`status-message ${submitStatus.type}`}
+          style={{
+            padding: "1rem",
+            marginBottom: "1rem",
+            borderRadius: "8px",
+            backgroundColor:
+              submitStatus.type === "success" ? "#d4edda" : "#f8d7da",
+            color: submitStatus.type === "success" ? "#155724" : "#721c24",
+            border: `1px solid ${
+              submitStatus.type === "success" ? "#c3e6cb" : "#f5c6cb"
+            }`,
+          }}
+        >
           {submitStatus.message}
         </div>
       )}
@@ -380,23 +396,32 @@ const DonationForm = ({ onSubmit, donorData }) => {
 
             {/* forFarmers checkbox */}
             <div className="form-group">
-              <label className="checkbox-label" style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '0.5rem',
-                cursor: 'pointer'
-              }}>
+              <label
+                className="checkbox-label"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  cursor: "pointer",
+                }}
+              >
                 <input
                   type="checkbox"
                   name="forFarmers"
                   checked={formData.forFarmers}
                   onChange={handleInputChange}
-                  style={{ marginRight: '0.5rem' }}
+                  style={{ marginRight: "0.5rem" }}
                 />
-                Available for Farmers/Animal Feed
+                For Farmers/Animal Feed
               </label>
-              <small style={{ color: '#666', marginTop: '0.25rem', display: 'block' }}>
-                Check this if the food can be used for animal consumption
+              <small
+                style={{
+                  color: "#666",
+                  marginTop: "0.25rem",
+                  display: "block",
+                }}
+              >
+                Check this if the food is for Farm use or Animal consumption
               </small>
             </div>
           </div>
@@ -405,10 +430,10 @@ const DonationForm = ({ onSubmit, donorData }) => {
         {/* Images */}
         <div className="form-section">
           <h3>Food Images (Optional)</h3>
-          
+
           {/* Upload Area */}
-          <div 
-            className={`image-upload-area ${dragActive ? 'drag-active' : ''}`}
+          <div
+            className={`image-upload-area ${dragActive ? "drag-active" : ""}`}
             onDragEnter={handleDrag}
             onDragLeave={handleDrag}
             onDragOver={handleDrag}
@@ -421,7 +446,7 @@ const DonationForm = ({ onSubmit, donorData }) => {
               accept="image/jpeg,image/jpg,image/png"
               multiple
               onChange={handleImageUpload}
-              style={{ display: 'none' }}
+              style={{ display: "none" }}
             />
             <label htmlFor="images" className="upload-label">
               <div className="upload-icon">📸</div>
@@ -435,10 +460,7 @@ const DonationForm = ({ onSubmit, donorData }) => {
             <div className="image-preview-grid">
               {images.map((image) => (
                 <div key={image.id} className="image-preview">
-                  <img
-                    src={image.url}
-                    alt="Food preview"
-                  />
+                  <img src={image.url} alt="Food preview" />
                   <button
                     type="button"
                     className="remove-image"
@@ -447,9 +469,7 @@ const DonationForm = ({ onSubmit, donorData }) => {
                   >
                     ✕
                   </button>
-                  <div className="image-name">
-                    {image.name}
-                  </div>
+                  <div className="image-name">{image.name}</div>
                 </div>
               ))}
             </div>
@@ -511,13 +531,13 @@ const DonationForm = ({ onSubmit, donorData }) => {
         </div>
 
         <div className="form-actions">
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             className="submit-btn"
             disabled={isSubmitting}
             style={{
               opacity: isSubmitting ? 0.7 : 1,
-              cursor: isSubmitting ? 'not-allowed' : 'pointer'
+              cursor: isSubmitting ? "not-allowed" : "pointer",
             }}
           >
             {isSubmitting ? "Submitting..." : "Submit Donation"}
